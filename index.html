@@ -113,11 +113,12 @@
           const [type, setType] = useState(null);
           const [currentQuiz, setCurrentQuiz] = useState(null);
           
-          // 이미 푼 문제를 기록하는 상태 (게임 모드별로 분리)
+          // 이미 푼 문제를 기록하는 상태
           const [playedQuizzes, setPlayedQuizzes] = useState({ enumeration: [], comparison: [] });
           
           const [bank, setBank] = useState([]);
-          const [selectedSlot, setSelectedSlot] = useState(null);
+          const [selectedSlot, setSelectedSlot] = useState(null); // 꼬치 게임용 (자동 선택)
+          const [selectedWord, setSelectedWord] = useState(null); // 샤브샤브 게임용 (재료 픽업)
           const [answers, setAnswers] = useState({});
           const [feedback, setFeedback] = useState({});
 
@@ -195,7 +196,6 @@
             const quiz = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
             const options = [...quiz.slots.map(s => s.answer), ...quiz.distractors].sort(() => Math.random() - 0.5);
             
-            // 푼 문제 목록 업데이트
             setPlayedQuizzes(prev => ({ ...prev, [quizType]: [...played, quiz.id] }));
             
             setType(quizType); 
@@ -203,37 +203,83 @@
             setBank(options); 
             setAnswers({}); 
             setFeedback({}); 
-            setSelectedSlot(null); 
+            setSelectedWord(null);
+            // 꼬치 게임일 경우 첫 번째 빈칸 자동 선택, 샤브샤브는 선택 안 함
+            setSelectedSlot(quizType === 'enumeration' ? quiz.slots[0].id : null); 
             setView('quiz');
           };
 
-          const handleSlotClick = (slotId) => { if (feedback[slotId] !== 'correct') { play8BitSound('selectSlot'); setSelectedSlot(slotId); } };
-
-          const handleWordSelect = (word) => {
-            if (!selectedSlot) return;
-            play8BitSound('selectOption');
-            const targetWord = word.trim();
-            let isCorrect = false;
-            const isAlreadyUsed = Object.values(answers).some(a => a.trim() === targetWord);
+          const handleSlotClick = (slotId) => { 
+            if (feedback[slotId] === 'correct') return;
 
             if (type === 'enumeration') {
-              isCorrect = currentQuiz.slots.map(s => s.answer.trim()).includes(targetWord);
+                // 꼬치 게임: 수동으로 빈칸을 변경하고 싶을 때
+                play8BitSound('selectSlot'); 
+                setSelectedSlot(slotId);
             } else {
-              if (selectedSlot.startsWith('common')) {
-                isCorrect = currentQuiz.slots.filter(s => s.id.startsWith('common')).map(s => s.answer.trim()).includes(targetWord);
-              } else {
-                const specificSlot = currentQuiz.slots.find(s => s.id === selectedSlot);
-                isCorrect = specificSlot && (specificSlot.answer.trim() === targetWord);
-              }
+                // 샤브샤브 게임: 재료를 고르고 난 뒤 빈칸을 눌렀을 때
+                if (!selectedWord) {
+                    play8BitSound('selectSlot'); // 단어를 먼저 고르지 않은 경우 소리만 재생
+                    return;
+                }
+
+                let isCorrect = false;
+                if (slotId.startsWith('common')) {
+                    isCorrect = currentQuiz.slots.filter(s => s.id.startsWith('common')).map(s => s.answer.trim()).includes(selectedWord);
+                } else {
+                    const specificSlot = currentQuiz.slots.find(s => s.id === slotId);
+                    isCorrect = specificSlot && (specificSlot.answer.trim() === selectedWord);
+                }
+
+                if (isCorrect) {
+                    play8BitSound('correct');
+                    const newAnswers = { ...answers, [slotId]: selectedWord };
+                    setAnswers(newAnswers); 
+                    setFeedback(prev => ({ ...prev, [slotId]: 'correct' })); 
+                    setSelectedWord(null); // 선택 초기화
+                    
+                    if (Object.keys(newAnswers).length === currentQuiz.slots.length) setTimeout(() => setView('success'), 1000);
+                } else {
+                    play8BitSound('wrong'); 
+                    setFeedback(prev => ({ ...prev, [slotId]: 'wrong' }));
+                    setSelectedWord(null); // 틀려도 다시 재료를 줍도록 초기화
+                    setTimeout(() => setFeedback(prev => ({ ...prev, [slotId]: null })), 800);
+                }
+            }
+          };
+
+          const handleWordSelect = (word) => {
+            const targetWord = word.trim();
+            const isAlreadyUsed = Object.values(answers).some(a => a.trim() === targetWord);
+            if (isAlreadyUsed) return;
+
+            play8BitSound('selectOption');
+
+            if (type === 'comparison') {
+                // 샤브샤브 게임: 재료 픽업
+                setSelectedWord(targetWord);
+                return;
             }
 
-            if (isCorrect && !isAlreadyUsed) {
+            // 꼬치 게임: 바로 정답 확인 (자동으로 선택된 빈칸 기준)
+            if (!selectedSlot) return; 
+            
+            let isCorrect = currentQuiz.slots.map(s => s.answer.trim()).includes(targetWord);
+
+            if (isCorrect) {
               play8BitSound('correct');
               const newAnswers = { ...answers, [selectedSlot]: word };
-              setAnswers(newAnswers); setFeedback(prev => ({ ...prev, [selectedSlot]: 'correct' })); setSelectedSlot(null);
+              setAnswers(newAnswers); 
+              setFeedback(prev => ({ ...prev, [selectedSlot]: 'correct' })); 
+              
+              // 정답을 맞추면 다음 빈칸 자동 탐색 후 선택
+              const nextSlot = currentQuiz.slots.find(s => !newAnswers[s.id]);
+              setSelectedSlot(nextSlot ? nextSlot.id : null);
+
               if (Object.keys(newAnswers).length === currentQuiz.slots.length) setTimeout(() => setView('success'), 1000);
             } else {
-              play8BitSound('wrong'); setFeedback(prev => ({ ...prev, [selectedSlot]: 'wrong' }));
+              play8BitSound('wrong'); 
+              setFeedback(prev => ({ ...prev, [selectedSlot]: 'wrong' }));
               setTimeout(() => setFeedback(prev => ({ ...prev, [selectedSlot]: null })), 800);
             }
           };
@@ -241,7 +287,7 @@
           const getSlotStyle = (slotId) => {
             if (feedback[slotId] === 'correct') return 'border-green-600 bg-white/95 shadow-inner';
             if (feedback[slotId] === 'wrong') return 'border-red-600 bg-red-50/90 animate-shake';
-            if (selectedSlot === slotId) return 'border-4 bg-white/95 shadow-2xl z-50 scale-105';
+            if (selectedSlot === slotId) return 'border-4 bg-white/95 shadow-2xl z-50 scale-105'; // 꼬치 게임 활성화 효과
             return 'border-black bg-white/75 backdrop-blur-sm hover:bg-white/95';
           };
           
@@ -298,7 +344,8 @@
                   
                   <div className="w-full max-w-[900px] flex flex-col sm:flex-row items-center justify-between gap-2 mb-4 z-[60]">
                     <div className="flex items-center gap-2 bg-white border-2 border-slate-900 py-1.5 px-3 sm:px-5 text-sm font-bold shadow-sm">
-                      <span className="animate-bounce">👉</span> 빈 칸 누르고 재료를 골라주세요!
+                      {/* UX 변경에 따라 안내 문구를 직관적으로 수정 */}
+                      <span className="animate-bounce">👉</span> {type === 'enumeration' ? '바구니에서 알맞은 재료를 바로 누르세요!' : '재료를 먼저 고른 후, 들어갈 빈칸을 누르세요!'}
                     </div>
                     <div className="border-2 border-slate-900 px-4 py-1.5 flex items-center gap-2 text-white shadow-sm font-bold responsive-text-base text-center break-keep" style={{ backgroundColor: currentPointColor }}>
                       <span>🔥</span> 
@@ -322,7 +369,6 @@
                                 className={`slot-btn skewer-slot rounded-xl relative ${getSlotStyle(slot.id)}`} 
                                 style={{ borderColor: getSlotBorder(slot.id) }}>
                                 <span className={`absolute top-1 sm:top-1.5 text-sm sm:text-xl font-bold text-green-600 leading-none transition-opacity duration-200 ${feedback[slot.id] === 'correct' ? 'opacity-100' : 'opacity-0'}`}>⭐</span>
-                                {/* 갈색(SKEWER_BROWN)으로 고정 */}
                                 <span className="text-slot font-bold px-1 break-keep z-10" style={{ color: SKEWER_BROWN }}>{answers[slot.id] || "빈 칸"}</span>
                               </button>
                             ))}
@@ -376,13 +422,20 @@
                     <div className="flex flex-wrap gap-2 justify-center py-1 relative z-10">
                       {bank.map((word, i) => {
                         const isUsed = Object.values(answers).includes(word);
+                        const isSelectedWord = selectedWord === word; // 샤브샤브 게임에서 선택된 단어인지 확인
+                        
                         return (
                           <button key={i} onClick={() => handleWordSelect(word)} disabled={isUsed} 
-                            className={`px-3 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[15px] transition-all border-2 border-slate-900 font-bold rounded shadow-sm
-                            ${isUsed ? 'opacity-0 scale-50 pointer-events-none absolute' : 'bg-white hover:bg-slate-50 active:scale-95 hover:-translate-y-0.5'}`} 
-                            style={{ borderColor: isUsed ? 'transparent' : '#111111' }}
-                            onMouseOver={(e) => { if(!isUsed) e.currentTarget.style.borderColor = currentPointColor; }} 
-                            onMouseOut={(e) => { if(!isUsed) e.currentTarget.style.borderColor = '#111111'; }}>
+                            // 선택된 단어일 경우 시각적으로 눈에 띄게 (크기 증가 및 배경색 변경) 스타일 수정
+                            className={`px-3 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[15px] transition-all border-2 font-bold rounded shadow-sm
+                            ${isUsed ? 'opacity-0 scale-50 pointer-events-none absolute' : 
+                              isSelectedWord ? 'bg-slate-100 scale-105 -translate-y-1' : 'bg-white hover:bg-slate-50 active:scale-95 hover:-translate-y-0.5'}`} 
+                            style={{ 
+                                borderColor: isUsed ? 'transparent' : isSelectedWord ? currentPointColor : '#111111',
+                                borderWidth: isSelectedWord ? '3px' : '2px'
+                            }}
+                            onMouseOver={(e) => { if(!isUsed && !isSelectedWord) e.currentTarget.style.borderColor = currentPointColor; }} 
+                            onMouseOut={(e) => { if(!isUsed && !isSelectedWord) e.currentTarget.style.borderColor = '#111111'; }}>
                             {word}
                           </button>
                         );
