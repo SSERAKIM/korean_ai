@@ -208,7 +208,8 @@
               play8BitSound('correct');
               const newAnswers = { ...answers, [selectedSlot]: word };
               setAnswers(newAnswers); setFeedback(prev => ({ ...prev, [selectedSlot]: 'correct' })); setSelectedSlot(null);
-              if (Object.keys(newAnswers).length === currentQuiz.slots.length) setTimeout(() => setView('success'), 800);
+              // 정답 화면 전환 딜레이를 800ms -> 1000ms로 늘려 안정성 확보
+              if (Object.keys(newAnswers).length === currentQuiz.slots.length) setTimeout(() => setView('success'), 1000);
             } else {
               play8BitSound('wrong'); setFeedback(prev => ({ ...prev, [selectedSlot]: 'wrong' }));
               setTimeout(() => setFeedback(prev => ({ ...prev, [selectedSlot]: null })), 800);
@@ -285,7 +286,8 @@
 
                   <div className="w-full border-2 border-slate-900 rounded-xl overflow-hidden shadow-sm relative" style={{ maxWidth: '900px', backgroundColor: '#f8fafc' }}>
                     
-                    <div className="absolute top-[3%] left-1/2 -translate-x-1/2 px-6 sm:px-10 py-1.5 sm:py-2.5 border-2 text-white text-title font-bold rounded-full shadow-md z-[60] whitespace-nowrap" style={{ backgroundColor: SKEWER_BROWN, borderColor: SKEWER_BROWN }}>
+                    {/* 모바일 화면에서 공통점 라벨과 겹치지 않게 top 비율을 소폭 수정했습니다 */}
+                    <div className="absolute top-[2%] sm:top-[3%] left-1/2 -translate-x-1/2 px-6 sm:px-10 py-1.5 sm:py-2.5 border-2 text-white text-title font-bold rounded-full shadow-md z-[60] whitespace-nowrap" style={{ backgroundColor: SKEWER_BROWN, borderColor: SKEWER_BROWN }}>
                       {type === 'enumeration' ? (currentQuiz ? currentQuiz.topic : '') : `${currentQuiz && currentQuiz.targets ? currentQuiz.targets[0] : ''} vs ${currentQuiz && currentQuiz.targets ? currentQuiz.targets[1] : ''}`}
                     </div>
 
@@ -298,7 +300,8 @@
                               <button key={slot.id} onClick={() => handleSlotClick(slot.id)} 
                                 className={`slot-btn skewer-slot rounded-xl ${getSlotStyle(slot.id)}`} 
                                 style={{ borderColor: getSlotBorder(slot.id) }}>
-                                {feedback[slot.id] === 'correct' && <span className="mb-0 text-sm sm:text-xl font-bold text-green-600 leading-none">⭐</span>}
+                                {/* 빈칸일 때도 투명 상태(opacity-0)로 영역을 차지하게 하여 레이아웃 높이 변화를 방지했습니다 */}
+                                <span className={`mb-0 text-sm sm:text-xl font-bold text-green-600 leading-none transition-opacity duration-200 ${feedback[slot.id] === 'correct' ? 'opacity-100' : 'opacity-0'}`}>⭐</span>
                                 <span className="text-slot font-bold px-1 mt-1 break-keep" style={{ color: answers[slot.id] ? '#0F172A' : SKEWER_BROWN }}>{answers[slot.id] || "빈 칸"}</span>
                               </button>
                             ))}
@@ -308,7 +311,8 @@
                         <React.Fragment>
                           <img src={SHABU_IMG} alt="Shabu" className="game-bg bg-shabu" />
                           
-                          <div className="absolute top-[16%] left-1/2 -translate-x-1/2 w-[24%] flex flex-col items-center z-50">
+                          {/* 모바일 환경에서 위 타이틀과 겹치지 않게 top 비율을 수정했습니다 */}
+                          <div className="absolute top-[22%] sm:top-[18%] md:top-[16%] left-1/2 -translate-x-1/2 w-[24%] flex flex-col items-center z-50">
                             <div className="px-4 py-0.5 sm:py-1 border-2 border-black text-white text-label font-bold rounded-full shadow-sm bg-blue-500 mb-[4%] whitespace-nowrap">공통점</div>
                             <div className="flex flex-col gap-2 w-full">
                               {['common1', 'common2'].map(sid => (
