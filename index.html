@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>낱말 요리 타이쿤</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @font-face { font-family: 'DosMyungjo'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSMyungjo.woff') format('woff'); }
+        * { font-family: 'DosMyungjo', sans-serif !important; }
+        body { background-color: #FFFFFF; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+        .animate-shake { animation: shake 0.2s ease-in-out infinite; }
+        .game-scaling-container { position: relative; width: 100%; max-width: 900px; margin: 0 auto; aspect-ratio: 16 / 11; }
+        .skewer-slot { width: 13%; height: 22%; max-width: 115px; max-height: 95px; }
+        .shabu-slot-common { width: 22%; height: 18%; max-width: 190px; max-height: 75px; }
+        .shabu-slot-side { width: 18%; height: 28%; max-width: 160px; max-height: 120px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // React 훅 가져오기
+        const { useState, useEffect, useRef } = React;
+
+        // --- 문제 데이터베이스 (기존 데이터와 동일) ---
+        const QUIZ_DATA = {
+            enumeration: [
+                { id: 'e1', topic: '우리나라의 전통 놀이', slots: [{id:'s1', answer:'제기차기'},{id:'s2', answer:'윷놀이'},{id:'s3', answer:'투호'},{id:'s4', answer:'널뛰기'}], distractors: ['스마트폰 게임', '체스', '축구'] },
+                { id: 'e2', topic: '태양계의 행성', slots: [{id:'s1', answer:'수성'},{id:'s2', answer:'금성'},{id:'s3', answer:'지구'},{id:'s4', answer:'화성'}], distractors: ['태양', '달', '안드로메다'] },
+                { id: 'e3', topic: '곤충', slots: [{id:'s1', answer:'매미'},{id:'s2', answer:'잠자리'},{id:'s3', answer:'사슴벌레'},{id:'s4', answer:'장수풍뎅이'}], distractors: ['고래', '사자', '펭귄'] },
+                { id: 'e4', topic: '학용품의 종류', slots: [{id:'s1', answer:'연필'},{id:'s2', answer:'지우개'},{id:'s3', answer:'자'},{id:'s4', answer:'필통'}], distractors: ['프라이팬', '침대', '칫솔'] },
+                { id: 'e5', topic: '겨울에 볼 수 있는 것', slots: [{id:'s1', answer:'눈사람'},{id:'s2', answer:'군고구마'},{id:'s3', answer:'목도리'},{id:'s4', answer:'썰매'}], distractors: ['반팔 티셔츠', '수박', '선풍기'] }
+            ],
+            comparison: [
+                { id: 'c1', targets: ['버스', '지하철'], slots: [{id:'common1', answer:'대중교통 수단이다'},{id:'common2', answer:'많은 사람이 이용한다'},{id:'diffA', answer:'도로 위를 달린다'},{id:'diffB', answer:'지하 선로를 이용한다'}], distractors: ['하늘을 날아다닌다', '개인이 소유하는 자가용'] }
+            ]
+        };
+
+        const getWaGwa = (word) => {
+            const lastChar = word.charCodeAt(word.length - 1);
+            return (lastChar - 0xAC00) % 28 > 0 ? '과' : '와';
+        };
+
+        function App() {
+            const [view, setView] = useState('home');
+            const [type, setType] = useState(null);
+            const [currentQuiz, setCurrentQuiz] = useState(null);
+            const [bank, setBank] = useState([]);
+            const [selectedSlot, setSelectedSlot] = useState(null);
+            const [answers, setAnswers] = useState({});
+            const [feedback, setFeedback] = useState({});
+            const audioCtxRef = useRef(null);
+
+            const PINK_COLOR = '#FF1E8D';
+            const BLUE_COLOR = '#3B82F6';
+            const SKEWER_BROWN = '#8B4513';
+            const currentPointColor = type === 'enumeration' ? PINK_COLOR : BLUE_COLOR;
+
+            const play8BitSound = (soundType) => {
+                if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                const ctx = audioCtxRef.current;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                const now = ctx.currentTime;
+                if (soundType === 'correct') {
+                    osc.type = 'square'; osc.frequency.setValueAtTime(523, now); osc.frequency.setValueAtTime(659, now+0.1);
+                    gain.gain.setValueAtTime(0.1, now); osc.start(); osc.stop(now+0.3);
+                } else if (soundType === 'wrong') {
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(220, now); osc.frequency.exponentialRampToValueAtTime(110, now+0.3);
+                    gain.gain.setValueAtTime(0.1, now); osc.start(); osc.stop(now+0.3);
+                }
+            };
+
+            const initQuiz = (quizType) => {
+                const quiz = QUIZ_DATA[quizType][Math.floor(Math.random() * QUIZ_DATA[quizType].length)];
+                setBank([...quiz.slots.map(s => s.answer), ...quiz.distractors].sort(() => Math.random() - 0.5));
+                setCurrentQuiz(quiz); setType(quizType); setAnswers({}); setFeedback({}); setView('quiz');
+            };
+
+            const handleWordSelect = (word) => {
+                if (!selectedSlot) return;
+                const isCorrect = currentQuiz.slots.find(s => s.id === selectedSlot).answer === word;
+                if (isCorrect) {
+                    play8BitSound('correct');
+                    const newAnswers = {...answers, [selectedSlot]: word};
+                    setAnswers(newAnswers); setFeedback({...feedback, [selectedSlot]: 'correct'}); setSelectedSlot(null);
+                    if (Object.keys(newAnswers).length === currentQuiz.slots.length) setTimeout(() => setView('success'), 500);
+                } else {
+                    play8BitSound('wrong');
+                    setFeedback({...feedback, [selectedSlot]: 'wrong'});
+                    setTimeout(() => setFeedback({...feedback, [selectedSlot]: null}), 500);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-white text-slate-900 flex flex-col items-center select-none overflow-x-hidden">
+                    <nav className="w-full px-6 py-2 bg-white border-b-2 border-slate-900 flex justify-between items-center max-w-6xl">
+                        <h1 className="text-lg font-bold" onClick={() => setView('home')}>👨‍🍳 낱말 요리 타이쿤</h1>
+                        {view === 'quiz' && <button onClick={() => setView('home')} className="px-3 py-1 bg-slate-100 border border-slate-900 rounded">뒤로가기</button>}
+                    </nav>
+
+                    {view === 'home' && (
+                        <div className="flex-1 flex flex-col items-center justify-center p-4">
+                            <h2 className="text-2xl mb-12 font-bold text-center">글의 구조 요리 게임</h2>
+                            <div className="grid grid-cols-2 gap-10">
+                                <button onClick={() => initQuiz('enumeration')} className="p-8 border-4 border-black hover:border-[#FF1E8D] transition-all">
+                                    <div className="text-6xl mb-2">🍢</div>
+                                    <div className="font-bold">산적꼬치 요리</div>
+                                </button>
+                                <button onClick={() => initQuiz('comparison')} className="p-8 border-4 border-black hover:border-[#3B82F6] transition-all">
+                                    <div className="text-6xl mb-2">🥘</div>
+                                    <div className="font-bold">샤브샤브 요리</div>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'quiz' && (
+                        <div className="flex-1 w-full max-w-4xl p-4 flex flex-col items-center">
+                            <div className="game-scaling-container bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center">
+                                <div className="text-center">
+                                    <p className="text-xl font-bold mb-4">{currentQuiz.topic || currentQuiz.targets.join(' vs ')}</p>
+                                    <div className="flex gap-4">
+                                        {currentQuiz.slots.map(slot => (
+                                            <button 
+                                                key={slot.id}
+                                                onClick={() => setSelectedSlot(slot.id)}
+                                                className={`w-24 h-24 border-2 flex items-center justify-center rounded-lg bg-white
+                                                    ${selectedSlot === slot.id ? 'border-blue-500 ring-4 ring-blue-200' : 'border-black'}
+                                                    ${feedback[slot.id] === 'correct' ? 'bg-green-50 border-green-500' : ''}
+                                                    ${feedback[slot.id] === 'wrong' ? 'animate-shake border-red-500' : ''}
+                                                `}
+                                            >
+                                                {answers[slot.id] || "빈 칸"}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-8 p-4 bg-white border-2 border-black w-full flex flex-wrap gap-2 justify-center">
+                                {bank.map((word, i) => (
+                                    <button 
+                                        key={i} 
+                                        onClick={() => handleWordSelect(word)}
+                                        disabled={Object.values(answers).includes(word)}
+                                        className={`px-4 py-2 border-2 border-black font-bold ${Object.values(answers).includes(word) ? 'opacity-0' : 'hover:bg-slate-100'}`}
+                                    >
+                                        {word}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'success' && (
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                            <h2 className="text-4xl font-bold mb-8">✨ 요리 완성! ✨</h2>
+                            <button onClick={() => setView('home')} className="px-8 py-4 bg-black text-white font-bold rounded-lg">메뉴로 돌아가기</button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
