@@ -1,626 +1,371 @@
-import React, { useState, useEffect, useRef } from 'react';
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>낱말 요리 타이쿤</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @font-face { font-family: 'DosMyungjo'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSMyungjo.woff') format('woff'); font-weight: normal; }
+        @font-face { font-family: 'Mona12emoji'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2603-1@1.0/Mona12Emoji.woff2') format('woff2'); font-weight: normal; }
+        * { font-family: 'DosMyungjo', 'Mona12emoji', sans-serif !important; font-weight: normal !important; }
+        body { background-color: #FFFFFF; margin: 0; image-rendering: pixelated; overflow-y: auto; overflow-x: hidden; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+        .animate-shake { animation: shake 0.2s ease-in-out infinite; }
+        @keyframes bounce-slow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .animate-bounce-slow { animation: bounce-slow 1s ease-in-out infinite; }
+        .pixelated { image-rendering: pixelated; }
+        
+        /* 완벽한 배치를 유지하며 비율대로 줄어드는 반응형 컨테이너 */
+        .game-scaling-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            aspect-ratio: 16 / 11;
+        }
+        .responsive-text { font-size: clamp(0.75rem, 1.3vw, 1.05rem); }
+        .responsive-title-text { font-size: clamp(0.9rem, 1.8vw, 1.25rem); }
+        .responsive-text-sm { font-size: clamp(0.7rem, 1.2vw, 1rem); }
+        .responsive-text-base { font-size: clamp(0.85rem, 1.5vw, 1.1rem); }
+        .responsive-text-lg { font-size: clamp(1rem, 2vw, 1.5rem); }
 
-// --- 문제 데이터베이스 ---
-const QUIZ_DATA = {
-  enumeration: [
-    {
-      id: 'e1',
-      topic: '우리나라의 전통 놀이',
-      slots: [
-        { id: 's1', label: '재료1', answer: '제기차기' },
-        { id: 's2', label: '재료2', answer: '윷놀이' },
-        { id: 's3', label: '재료3', answer: '투호' },
-        { id: 's4', label: '재료4', answer: '널뛰기' }
-      ],
-      distractors: ['스마트폰 게임', '체스', '축구']
-    },
-    {
-      id: 'e2',
-      topic: '태양계의 행성',
-      slots: [
-        { id: 's1', label: '재료1', answer: '수성' },
-        { id: 's2', label: '재료2', answer: '금성' },
-        { id: 's3', label: '재료3', answer: '지구' },
-        { id: 's4', label: '재료4', answer: '화성' }
-      ],
-      distractors: ['태양', '달', '안드로메다']
-    },
-    {
-      id: 'e3',
-      topic: '곤충',
-      slots: [
-        { id: 's1', label: '재료1', answer: '매미' },
-        { id: 's2', label: '재료2', answer: '잠자리' },
-        { id: 's3', label: '재료3', answer: '사슴벌레' },
-        { id: 's4', label: '재료4', answer: '장수풍뎅이' }
-      ],
-      distractors: ['고래', '사자', '펭귄']
-    },
-    {
-      id: 'e4',
-      topic: '학용품의 종류',
-      slots: [
-        { id: 's1', label: '도구1', answer: '연필' },
-        { id: 's2', label: '도구2', answer: '지우개' },
-        { id: 's3', label: '도구3', answer: '자' },
-        { id: 's4', label: '도구4', answer: '필통' }
-      ],
-      distractors: ['프라이팬', '침대', '칫솔']
-    },
-    {
-      id: 'e5',
-      topic: '겨울에 볼 수 있는 것',
-      slots: [
-        { id: 's1', label: '재료1', answer: '눈사람' },
-        { id: 's2', label: '재료2', answer: '군고구마' },
-        { id: 's3', label: '재료3', answer: '목도리' },
-        { id: 's4', label: '재료4', answer: '썰매' }
-      ],
-      distractors: ['반팔 티셔츠', '수박', '선풍기']
-    },
-    {
-      id: 'e6',
-      topic: '현악기의 종류',
-      slots: [
-        { id: 's1', label: '재료1', answer: '바이올린' },
-        { id: 's2', label: '재료2', answer: '첼로' },
-        { id: 's3', label: '재료3', answer: '가야금' },
-        { id: 's4', label: '재료4', answer: '거문고' }
-      ],
-      distractors: ['트럼펫', '드럼', '피리']
-    },
-    {
-      id: 'e7',
-      topic: '우리나라의 광역시',
-      slots: [
-        { id: 's1', label: '재료1', answer: '부산' },
-        { id: 's2', label: '재료2', answer: '대구' },
-        { id: 's3', label: '재료3', answer: '인천' },
-        { id: 's4', label: '재료4', answer: '광주' }
-      ],
-      distractors: ['서울', '제주', '도쿄', '대전']
-    },
-    {
-      id: 'e8',
-      topic: '에너지 절약 방법',
-      slots: [
-        { id: 's1', label: '재료1', answer: '전등 끄기' },
-        { id: 's2', label: '재료2', answer: '코드 뽑기' },
-        { id: 's3', label: '재료3', answer: '계단 이용' },
-        { id: 's4', label: '재료4', answer: '물 아껴 쓰기' }
-      ],
-      distractors: ['에어컨 종일 켜기', '빨래 조금씩 자주 하기']
-    }
-  ],
-  comparison: [
-    {
-      id: 'c1',
-      targets: ['버스', '지하철'],
-      slots: [
-        { id: 'common1', label: '공통점1', answer: '대중교통 수단이다' },
-        { id: 'common2', label: '공통점2', answer: '많은 사람이 이용한다' },
-        { id: 'diffA', label: '특징A', answer: '도로 위를 달린다' },
-        { id: 'diffB', label: '특징B', answer: '지하 선로를 이용한다' }
-      ],
-      distractors: ['하늘을 날아다닌다', '개인이 소유하는 자가용', '우주로 나가는 발사체']
-    },
-    {
-      id: 'c2',
-      targets: ['도서관', '서점'],
-      slots: [
-        { id: 'common1', label: '공통점1', answer: '책이 아주 많다' },
-        { id: 'common2', label: '공통점2', answer: '조용히 해야 하는 장소이다' },
-        { id: 'diffA', label: '특징A', answer: '무료로 책을 빌려준다' },
-        { id: 'diffB', label: '특징B', answer: '돈을 내고 책을 산다' }
-      ],
-      distractors: ['음식을 요리해서 판다', '운동경기를 관람하는 곳', '영화를 상영하는 극장']
-    },
-    {
-      id: 'c3',
-      targets: ['축구', '농구'],
-      slots: [
-        { id: 'common1', label: '공통점1', answer: '공을 사용하는 운동이다' },
-        { id: 'common2', label: '공통점2', answer: '팀을 나누어 경기를 한다' },
-        { id: 'diffA', label: '특징A', answer: '주로 발로 공을 찬다' },
-        { id: 'diffB', label: '특징B', answer: '주로 손으로 공을 던진다' }
-      ],
-      distractors: ['물속에서 하는 운동이다', '혼자서만 즐기는 스포츠', '얼음 위에서 타는 스케이트']
-    },
-    {
-      id: 'c4',
-      targets: ['지구', '달'],
-      slots: [
-        { id: 'common1', label: '공통점1', answer: '우주에 있는 천체이다' },
-        { id: 'common2', label: '공통점2', answer: '둥근 모양을 하고 있다' },
-        { id: 'diffA', label: '특징A', answer: '생명체가 살고 있다' },
-        { id: 'diffB', label: '특징B', answer: '지구의 주위를 도는 위성이다' }
-      ],
-      distractors: ['사람이 만든 인공물이다', '눈이 부시게 빛나는 항성', '사각형의 평평한 모양']
-    },
-    {
-      id: 'c5',
-      targets: ['연필', '샤프'],
-      slots: [
-        { id: 'common1', label: '공통점1', answer: '글씨를 쓰는 도구이다' },
-        { id: 'common2', label: '공통점2', answer: '공부할 때 주로 사용한다' },
-        { id: 'diffA', label: '특징A', answer: '나무로 만들어 깎아 쓴다' },
-        { id: 'diffB', label: '특징B', answer: '버튼을 눌러 심을 낸다' }
-      ],
-      distractors: ['배고플 때 먹는 음식이다', '발에 신는 신발의 종류', '몸을 씻는 세면도구']
-    },
-    {
-      id: 'c6',
-      targets: ['종이책', '전자책'],
-      slots: [
-        { id: 'common1', label: '공통점1', answer: '정보를 전달하는 매체이다' },
-        { id: 'common2', label: '공통점2', answer: '글과 그림으로 구성되어 있다' },
-        { id: 'diffA', label: '특징A', answer: '종이로 만들어 넘겨 읽는다' },
-        { id: 'diffB', label: '특징B', answer: '전자기기 화면을 통해 읽는다' }
-      ],
-      distractors: ['배터리가 없어도 둘 다 작동한다', '음악을 연주하는 악기이다', '옷을 만드는 재료이다']
-    },
-    {
-      id: 'c7',
-      targets: ['육지 생물', '바다 생물'],
-      slots: [
-        { id: 'common1', label: '공통점1', answer: '숨을 쉬며 살아간다' },
-        { id: 'common2', label: '공통점2', answer: '먹이를 먹고 에너지를 얻는다' },
-        { id: 'diffA', label: '특징A', answer: '땅 위에서 다리로 걷거나 뛴다' },
-        { id: 'diffB', label: '특징B', answer: '물속에서 헤엄치며 생활한다' }
-      ],
-      distractors: ['모두 지느러미를 이용해 이동한다', '광합성을 해서 영양분을 만든다', '금속으로 몸이 이루어져 있다']
-    },
-    {
-      id: 'c8',
-      targets: ['안경', '선글라스'],
-      slots: [
-        { id: 'common1', label: '공통점1', answer: '눈(얼굴)에 착용하는 도구이다' },
-        { id: 'common2', label: '공통점2', answer: '눈을 보호하거나 시력을 돕는다' },
-        { id: 'diffA', label: '특징A', answer: '주로 시력을 교정하기 위해 쓴다' },
-        { id: 'diffB', label: '특징B', answer: '햇빛(자외선)을 차단하기 위해 쓴다' }
-      ],
-      distractors: ['발에 신어서 걸어 다닐 때 쓴다', '머리에 쓰고 자는 모자이다', '입술에 바르는 화장품이다']
-    }
-  ]
-};
+        /* 빈 칸 박스 크기 및 가동 범위 제한 */
+        .skewer-slot { width: 13%; height: 22%; max-width: 115px; max-height: 95px; }
+        .shabu-slot-common { width: 22%; height: 18%; max-width: 190px; max-height: 75px; }
+        .shabu-slot-side { width: 18%; height: 28%; max-width: 160px; max-height: 120px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-const getWaGwa = (word) => {
-  if (!word) return '와';
-  const lastChar = word.charCodeAt(word.length - 1);
-  if (lastChar < 0xAC00 || lastChar > 0xD7A3) return '와';
-  return (lastChar - 0xAC00) % 28 > 0 ? '과' : '와';
-};
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
 
-const App = () => {
-  const [view, setView] = useState('home'); 
-  const [type, setType] = useState(null);
-  const [currentQuiz, setCurrentQuiz] = useState(null);
-  const [lastQuizId, setLastQuizId] = useState(null);
-  const [bank, setBank] = useState([]);
-  const [selectedSlot, setSelectedSlot] = useState(null);
-  const [answers, setAnswers] = useState({});
-  const [feedback, setFeedback] = useState({});
+        // --- 완벽히 동기화된 전체 문제 데이터베이스 ---
+        const QUIZ_DATA = {
+          enumeration: [
+            {
+              id: 'e1', topic: '우리나라의 전통 놀이',
+              slots: [{ id: 's1', label: '재료1', answer: '제기차기' },{ id: 's2', label: '재료2', answer: '윷놀이' },{ id: 's3', label: '재료3', answer: '투호' },{ id: 's4', label: '재료4', answer: '널뛰기' }],
+              distractors: ['스마트폰 게임', '체스', '축구']
+            },
+            {
+              id: 'e2', topic: '태양계의 행성',
+              slots: [{ id: 's1', label: '재료1', answer: '수성' },{ id: 's2', label: '재료2', answer: '금성' },{ id: 's3', label: '재료3', answer: '지구' },{ id: 's4', label: '재료4', answer: '화성' }],
+              distractors: ['태양', '달', '안드로메다']
+            },
+            {
+              id: 'e3', topic: '곤충',
+              slots: [{ id: 's1', label: '재료1', answer: '매미' },{ id: 's2', label: '재료2', answer: '잠자리' },{ id: 's3', label: '재료3', answer: '사슴벌레' },{ id: 's4', label: '재료4', answer: '장수풍뎅이' }],
+              distractors: ['고래', '사자', '펭귄']
+            },
+            {
+              id: 'e4', topic: '학용품의 종류',
+              slots: [{ id: 's1', label: '도구1', answer: '연필' },{ id: 's2', label: '도구2', answer: '지우개' },{ id: 's3', label: '도구3', answer: '자' },{ id: 's4', label: '도구4', answer: '필통' }],
+              distractors: ['프라이팬', '침대', '칫솔']
+            },
+            {
+              id: 'e5', topic: '겨울에 볼 수 있는 것',
+              slots: [{ id: 's1', label: '재료1', answer: '눈사람' },{ id: 's2', label: '재료2', answer: '군고구마' },{ id: 's3', label: '재료3', answer: '목도리' },{ id: 's4', label: '재료4', answer: '썰매' }],
+              distractors: ['반팔 티셔츠', '수박', '선풍기']
+            },
+            {
+              id: 'e6', topic: '현악기의 종류',
+              slots: [{ id: 's1', label: '재료1', answer: '바이올린' },{ id: 's2', label: '재료2', answer: '첼로' },{ id: 's3', label: '재료3', answer: '가야금' },{ id: 's4', label: '재료4', answer: '거문고' }],
+              distractors: ['트럼펫', '드럼', '피리']
+            },
+            {
+              id: 'e7', topic: '우리나라의 광역시',
+              slots: [{ id: 's1', label: '재료1', answer: '부산' },{ id: 's2', label: '재료2', answer: '대구' },{ id: 's3', label: '재료3', answer: '인천' },{ id: 's4', label: '재료4', answer: '광주' }],
+              distractors: ['서울', '제주', '도쿄', '대전']
+            },
+            {
+              id: 'e8', topic: '에너지 절약 방법',
+              slots: [{ id: 's1', label: '재료1', answer: '전등 끄기' },{ id: 's2', label: '재료2', answer: '코드 뽑기' },{ id: 's3', label: '재료3', answer: '계단 이용' },{ id: 's4', label: '재료4', answer: '물 아껴 쓰기' }],
+              distractors: ['에어컨 종일 켜기', '빨래 조금씩 자주 하기']
+            }
+          ],
+          comparison: [
+            {
+              id: 'c1', targets: ['버스', '지하철'],
+              slots: [{ id: 'common1', label: '공통점1', answer: '대중교통 수단이다' },{ id: 'common2', label: '공통점2', answer: '많은 사람이 이용한다' },{ id: 'diffA', label: '특징A', answer: '도로 위를 달린다' },{ id: 'diffB', label: '특징B', answer: '지하 선로를 이용한다' }],
+              distractors: ['하늘을 날아다닌다', '개인이 소유하는 자가용', '우주로 나가는 발사체']
+            },
+            {
+              id: 'c2', targets: ['도서관', '서점'],
+              slots: [{ id: 'common1', label: '공통점1', answer: '책이 아주 많다' },{ id: 'common2', label: '공통점2', answer: '조용히 해야 하는 장소이다' },{ id: 'diffA', label: '특징A', answer: '무료로 책을 빌려준다' },{ id: 'diffB', label: '특징B', answer: '돈을 내고 책을 산다' }],
+              distractors: ['음식을 요리해서 판다', '운동경기를 관람하는 곳', '영화를 상영하는 극장']
+            },
+            {
+              id: 'c3', targets: ['축구', '농구'],
+              slots: [{ id: 'common1', label: '공통점1', answer: '공을 사용하는 운동이다' },{ id: 'common2', label: '공통점2', answer: '팀을 나누어 경기를 한다' },{ id: 'diffA', label: '특징A', answer: '주로 발로 공을 찬다' },{ id: 'diffB', label: '특징B', answer: '주로 손으로 공을 던진다' }],
+              distractors: ['물속에서 하는 운동이다', '혼자서만 즐기는 스포츠', '얼음 위에서 타는 스케이트']
+            },
+            {
+              id: 'c4', targets: ['지구', '달'],
+              slots: [{ id: 'common1', label: '공통점1', answer: '우주에 있는 천체이다' },{ id: 'common2', label: '공통점2', answer: '둥근 모양을 하고 있다' },{ id: 'diffA', label: '특징A', answer: '생명체가 살고 있다' },{ id: 'diffB', label: '특징B', answer: '지구의 주위를 도는 위성이다' }],
+              distractors: ['사람이 만든 인공물이다', '눈이 부시게 빛나는 항성', '사각형의 평평한 모양']
+            },
+            {
+              id: 'c5', targets: ['연필', '샤프'],
+              slots: [{ id: 'common1', label: '공통점1', answer: '글씨를 쓰는 도구이다' },{ id: 'common2', label: '공통점2', answer: '공부할 때 주로 사용한다' },{ id: 'diffA', label: '특징A', answer: '나무로 만들어 깎아 쓴다' },{ id: 'diffB', label: '특징B', answer: '버튼을 눌러 심을 낸다' }],
+              distractors: ['배고플 때 먹는 음식이다', '발에 신는 신발의 종류', '몸을 씻는 세면도구']
+            },
+            {
+              id: 'c6', targets: ['종이책', '전자책'],
+              slots: [{ id: 'common1', label: '공통점1', answer: '정보를 전달하는 매체이다' },{ id: 'common2', label: '공통점2', answer: '글과 그림으로 구성되어 있다' },{ id: 'diffA', label: '특징A', answer: '종이로 만들어 넘겨 읽는다' },{ id: 'diffB', label: '특징B', answer: '전자기기 화면을 통해 읽는다' }],
+              distractors: ['배터리가 없어도 둘 다 작동한다', '음악을 연주하는 악기이다', '옷을 만드는 재료이다']
+            },
+            {
+              id: 'c7', targets: ['육지 생물', '바다 생물'],
+              slots: [{ id: 'common1', label: '공통점1', answer: '숨을 쉬며 살아간다' },{ id: 'common2', label: '공통점2', answer: '먹이를 먹고 에너지를 얻는다' },{ id: 'diffA', label: '특징A', answer: '땅 위에서 다리로 걷거나 뛴다' },{ id: 'diffB', label: '특징B', answer: '물속에서 헤엄치며 생활한다' }],
+              distractors: ['모두 지느러미를 이용해 이동한다', '광합성을 해서 영양분을 만든다', '금속으로 몸이 이루어져 있다']
+            },
+            {
+              id: 'c8', targets: ['안경', '선글라스'],
+              slots: [{ id: 'common1', label: '공통점1', answer: '눈(얼굴)에 착용하는 도구이다' },{ id: 'common2', label: '공통점2', answer: '눈을 보호하거나 시력을 돕는다' },{ id: 'diffA', label: '특징A', answer: '주로 시력을 교정하기 위해 쓴다' },{ id: 'diffB', label: '특징B', answer: '햇빛(자외선)을 차단하기 위해 쓴다' }],
+              distractors: ['발에 신어서 걸어 다닐 때 쓴다', '머리에 쓰고 자는 모자이다', '입술에 바르는 화장품이다']
+            }
+          ]
+        };
 
-  // 효과음 생성을 위한 AudioContext 관리
-  const audioCtxRef = useRef(null);
+        function App() {
+          const [view, setView] = useState('home'); 
+          const [type, setType] = useState(null);
+          const [currentQuiz, setCurrentQuiz] = useState(null);
+          const [lastQuizId, setLastQuizId] = useState(null);
+          const [bank, setBank] = useState([]);
+          const [selectedSlot, setSelectedSlot] = useState(null);
+          const [answers, setAnswers] = useState({});
+          const [feedback, setFeedback] = useState({});
+          const audioCtxRef = useRef(null);
 
-  const SKEWER_IMG = "https://raw.githubusercontent.com/SSERAKIM/k-cook-word-game/refs/heads/main/cookgame_01.png";
-  const SHABU_IMG = "https://raw.githubusercontent.com/SSERAKIM/k-cook-word-game/refs/heads/main/cookgame_02.png";
+          const SKEWER_IMG = "https://i.postimg.cc/vB0FWNLq/Gemini-Generated-Image-g7lqpag7lqpag7lq.png";
+          const SHABU_IMG = "https://i.postimg.cc/NGN2MGTk/Gemini-Generated-Image-iborijiborijibor.png";
 
-  const PINK_COLOR = '#FF1E8D';
-  const BLUE_COLOR = '#3B82F6';
-  const ORANGE_COLOR = '#FF7D00';
-  const SKEWER_BROWN = '#8B4513';
+          const PINK_COLOR = '#FF1E8D';
+          const BLUE_COLOR = '#3B82F6';
+          const ORANGE_COLOR = '#FF7D00';
+          const SKEWER_BROWN = '#8B4513';
+          const currentPointColor = type === 'enumeration' ? PINK_COLOR : BLUE_COLOR;
 
-  const currentPointColor = type === 'enumeration' ? PINK_COLOR : BLUE_COLOR;
+          const play8BitSound = (soundType) => {
+            try {
+              if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+              const ctx = audioCtxRef.current;
+              if (ctx.state === 'suspended') ctx.resume();
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.connect(gain); gain.connect(ctx.destination);
+              const now = ctx.currentTime;
 
-  // --- 8-bit 효과음 생성 함수 ---
-  const play8BitSound = (soundType) => {
-    try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') ctx.resume();
+              switch(soundType) {
+                case 'startGame':
+                  osc.type = 'square'; osc.frequency.setValueAtTime(330, now); osc.frequency.setValueAtTime(440, now + 0.05); osc.frequency.setValueAtTime(660, now + 0.1);
+                  gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                  osc.start(now); osc.stop(now + 0.2); break;
+                case 'selectSlot':
+                  osc.type = 'triangle'; osc.frequency.setValueAtTime(880, now);
+                  gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                  osc.start(now); osc.stop(now + 0.1); break;
+                case 'selectOption':
+                  osc.type = 'square'; osc.frequency.setValueAtTime(440, now);
+                  gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                  osc.start(now); osc.stop(now + 0.05); break;
+                case 'correct':
+                  osc.type = 'square'; osc.frequency.setValueAtTime(523.25, now); osc.frequency.setValueAtTime(659.25, now + 0.07); osc.frequency.setValueAtTime(783.99, now + 0.14);
+                  gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                  osc.start(now); osc.stop(now + 0.4); break;
+                case 'wrong':
+                  osc.type = 'sawtooth'; osc.frequency.setValueAtTime(220, now); osc.frequency.exponentialRampToValueAtTime(110, now + 0.3);
+                  gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                  osc.start(now); osc.stop(now + 0.3); break;
+                case 'fanfare':
+                  osc.type = 'square';
+                  [523.25, 523.25, 659.25, 783.99, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                    osc.frequency.setValueAtTime(freq, now + i * 0.12);
+                  });
+                  gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
+                  osc.start(now); osc.stop(now + 1.0); break;
+              }
+            } catch (e) {}
+          };
 
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+          useEffect(() => { if (view === 'success') play8BitSound('fanfare'); }, [view]);
 
-      const now = ctx.currentTime;
+          const initQuiz = (quizType) => {
+            play8BitSound('startGame');
+            const questions = QUIZ_DATA[quizType];
+            let availableQuestions = questions.length > 1 ? questions.filter(q => q.id !== lastQuizId) : questions;
+            const quiz = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+            const options = [...quiz.slots.map(s => s.answer), ...quiz.distractors].sort(() => Math.random() - 0.5);
+            setLastQuizId(quiz.id); setType(quizType); setCurrentQuiz(quiz); setBank(options); setAnswers({}); setFeedback({}); setSelectedSlot(null); setView('quiz');
+          };
 
-      switch(soundType) {
-        case 'startGame': // 요리 선택: 짧게 상승하는 시작음
-          osc.type = 'square';
-          osc.frequency.setValueAtTime(330, now); // E4
-          osc.frequency.setValueAtTime(440, now + 0.05); // A4
-          osc.frequency.setValueAtTime(660, now + 0.1); // E5
-          gain.gain.setValueAtTime(0.1, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-          osc.start(now);
-          osc.stop(now + 0.2);
-          break;
-        case 'selectSlot': // 슬롯 선택: 가볍고 높은 톤
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(880, now); // A5
-          gain.gain.setValueAtTime(0.1, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-          osc.start(now);
-          osc.stop(now + 0.1);
-          break;
-        case 'selectOption': // 재료 선택: 짧은 클릭음
-          osc.type = 'square';
-          osc.frequency.setValueAtTime(440, now); // A4
-          gain.gain.setValueAtTime(0.05, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-          osc.start(now);
-          osc.stop(now + 0.05);
-          break;
-        case 'correct': // 정답: 경쾌한 띠링
-          osc.type = 'square';
-          osc.frequency.setValueAtTime(523.25, now); // C5
-          osc.frequency.setValueAtTime(659.25, now + 0.07); // E5
-          osc.frequency.setValueAtTime(783.99, now + 0.14); // G5
-          gain.gain.setValueAtTime(0.1, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-          osc.start(now);
-          osc.stop(now + 0.4);
-          break;
-        case 'wrong': // 오답: 묵직한 하강음
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(220, now); // A3
-          osc.frequency.exponentialRampToValueAtTime(110, now + 0.3); // A2
-          gain.gain.setValueAtTime(0.1, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-          osc.start(now);
-          osc.stop(now + 0.3);
-          break;
-        case 'fanfare': // 요리 완성: 8비트 빵빠레
-          osc.type = 'square';
-          const fanfareNotes = [523.25, 523.25, 659.25, 783.99, 659.25, 783.99, 1046.50]; // C5, C5, E5, G5, E5, G5, C6
-          fanfareNotes.forEach((freq, i) => {
-            osc.frequency.setValueAtTime(freq, now + i * 0.12);
-          });
-          gain.gain.setValueAtTime(0.1, now);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
-          osc.start(now);
-          osc.stop(now + 1.0);
-          break;
-        default:
-          break;
-      }
-    } catch (e) {
-      console.warn("Audio Context Error: ", e);
-    }
-  };
+          const handleSlotClick = (slotId) => { if (feedback[slotId] !== 'correct') { play8BitSound('selectSlot'); setSelectedSlot(slotId); } };
 
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @font-face { font-family: 'DosMyungjo'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSMyungjo.woff') format('woff'); font-weight: normal; }
-      @font-face { font-family: 'Mona12emoji'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2603-1@1.0/Mona12Emoji.woff2') format('woff2'); font-weight: normal; }
-      * { font-family: 'DosMyungjo', 'Mona12emoji', sans-serif !important; font-weight: normal !important; }
-      body { background-color: #FFFFFF; margin: 0; image-rendering: pixelated; overflow-y: auto; overflow-x: hidden; }
-      @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
-      .animate-shake { animation: shake 0.2s ease-in-out infinite; }
-      @keyframes bounce-slow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-      .animate-bounce-slow { animation: bounce-slow 1s ease-in-out infinite; }
-      .pixelated { image-rendering: pixelated; }
-    `;
-    document.head.appendChild(style);
+          const handleWordSelect = (word) => {
+            if (!selectedSlot) return;
+            play8BitSound('selectOption');
+            const targetWord = word.trim();
+            let isCorrect = false;
+            const isAlreadyUsed = Object.values(answers).some(a => a.trim() === targetWord);
 
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
+            if (type === 'enumeration') {
+              isCorrect = currentQuiz.slots.map(s => s.answer.trim()).includes(targetWord);
+            } else {
+              if (selectedSlot.startsWith('common')) {
+                isCorrect = currentQuiz.slots.filter(s => s.id.startsWith('common')).map(s => s.answer.trim()).includes(targetWord);
+              } else {
+                isCorrect = currentQuiz.slots.find(s => s.id === selectedSlot)?.answer.trim() === targetWord;
+              }
+            }
 
-  // 완성 화면 진입 시 빵빠레 재생
-  useEffect(() => {
-    if (view === 'success') {
-      play8BitSound('fanfare');
-    }
-  }, [view]);
+            if (isCorrect && !isAlreadyUsed) {
+              play8BitSound('correct');
+              const newAnswers = { ...answers, [selectedSlot]: word };
+              setAnswers(newAnswers); setFeedback(prev => ({ ...prev, [selectedSlot]: 'correct' })); setSelectedSlot(null);
+              if (Object.keys(newAnswers).length === currentQuiz.slots.length) setTimeout(() => setView('success'), 800);
+            } else {
+              play8BitSound('wrong'); setFeedback(prev => ({ ...prev, [selectedSlot]: 'wrong' }));
+              setTimeout(() => setFeedback(prev => ({ ...prev, [selectedSlot]: null })), 800);
+            }
+          };
 
-  const initQuiz = (quizType) => {
-    play8BitSound('startGame'); // 요리 종류 버튼 클릭 시 효과음 재생
+          return (
+            <div className="min-h-screen bg-white text-slate-900 flex flex-col items-center select-none overflow-x-hidden">
+              {view !== 'success' && (
+                <nav className="w-full px-4 sm:px-6 py-1 bg-white border-b-2 border-slate-900 flex justify-between items-center max-w-6xl sticky top-0 z-[100] shadow-sm">
+                  <div className="flex items-center gap-2 sm:gap-4 cursor-pointer" onClick={() => setView('home')}>
+                    <div className="text-2xl sm:text-3xl">👨‍🍳</div>
+                    <div className="flex flex-col">
+                      <h1 className="text-base sm:text-lg tracking-tight uppercase leading-none font-bold">낱말 요리 타이쿤</h1>
+                      {view === 'quiz' && <div className="text-[10px] sm:text-[12px] mt-0.5 sm:mt-1 uppercase tracking-widest font-bold" style={{ color: currentPointColor }}>{type === 'enumeration' ? '산적꼬치' : '샤브샤브'}</div>}
+                    </div>
+                  </div>
+                  {view === 'quiz' && <button onClick={() => setView('home')} className="px-3 py-1 sm:px-4 sm:py-2 bg-slate-100 border border-slate-900 text-[12px] sm:text-[14px] hover:bg-white active:translate-y-0.5 transition-all">뒤로가기</button>}
+                </nav>
+              )}
 
-    const questions = QUIZ_DATA[quizType];
-    let availableQuestions = questions;
-    if (questions.length > 1) {
-      availableQuestions = questions.filter(q => q.id !== lastQuizId);
-    }
-    const quiz = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
-    const options = [...quiz.slots.map(s => s.answer), ...quiz.distractors].sort(() => Math.random() - 0.5);
-    
-    setLastQuizId(quiz.id);
-    setType(quizType);
-    setCurrentQuiz(quiz);
-    setBank(options);
-    setAnswers({});
-    setFeedback({});
-    setSelectedSlot(null);
-    setView('quiz');
-  };
+              {view === 'home' && (
+                <div className="flex-1 flex flex-col items-center justify-center p-4 text-center w-full max-w-4xl animate-in fade-in duration-500">
+                  <div className="mb-4 flex justify-center"><img src="https://media.tenor.com/MfpEA0u1yYgAAAAj/9.gif" alt="Chef" className="w-[100px] h-[100px] sm:w-[140px] sm:h-[140px] object-contain" /></div>
+                  <h2 className="text-xl sm:text-2xl md:text-3xl mb-8 sm:mb-12 leading-tight tracking-tighter"><span style={{ color: ORANGE_COLOR }}>글의 구조</span> 요리 게임<br/>재료를 모아 요리를 완성해요!</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10 w-full px-4 max-w-3xl mb-8">
+                    <button onClick={() => initQuiz('enumeration')} className="bg-white p-6 sm:p-8 transition-all group flex flex-col items-center active:scale-95 border-4 border-[#111111] hover:border-[#FF1E8D]">
+                      <div className="text-5xl sm:text-6xl mb-4 group-hover:scale-110 transition-transform">🍢</div>
+                      <h3 className="text-lg sm:text-xl mb-2 font-bold">산적꼬치 요리</h3>
+                      <p className="text-[12px] sm:text-[14px] mb-3 uppercase tracking-tighter font-bold" style={{ color: PINK_COLOR }}>[ 열거 구조 ]</p>
+                      <p className="text-slate-500 text-[10px] sm:text-xs">재료를 하나씩 콕콕!</p>
+                    </button>
+                    <button onClick={() => initQuiz('comparison')} className="bg-white p-6 sm:p-8 transition-all group flex flex-col items-center active:scale-95 border-4 border-[#111111] hover:border-[#3B82F6]">
+                      <div className="text-5xl sm:text-6xl mb-4 group-hover:scale-110 transition-transform">🥘</div>
+                      <h3 className="text-lg sm:text-xl mb-2 font-bold">샤브샤브 요리</h3>
+                      <p className="text-[12px] sm:text-[14px] mb-3 uppercase tracking-tighter font-bold" style={{ color: BLUE_COLOR }}>[ 비교와 대조 ]</p>
+                      <p className="text-slate-500 text-[10px] sm:text-xs">공통점과 차이점을 담아요.</p>
+                    </button>
+                  </div>
+                </div>
+              )}
 
-  const handleSlotClick = (slotId) => {
-    if (feedback[slotId] === 'correct') return;
-    play8BitSound('selectSlot'); // 슬롯 선택음 재생
-    setSelectedSlot(slotId);
-  };
+              {view === 'quiz' && currentQuiz && (
+                <div className="flex-1 w-full max-w-[1200px] px-4 sm:px-6 py-2 flex flex-col items-center overflow-hidden">
+                  <div className="w-full max-w-[900px] flex flex-col sm:flex-row items-center justify-between gap-2 mb-4 z-[60]">
+                    <div className="flex items-center gap-2 sm:gap-3 bg-white border-2 border-slate-900 py-1.5 px-3 sm:py-2.5 sm:px-5 text-[11px] sm:text-[14px] w-full sm:w-auto font-bold"><span className="animate-bounce">👉</span> 빈 칸 누르고 재료를 골라주세요!</div>
+                    <div className="border-2 border-slate-900 px-4 py-1.5 flex items-center gap-2 text-white shadow-sm font-bold responsive-text-base w-full sm:w-auto overflow-hidden" style={{ backgroundColor: currentPointColor }}><span>🔥</span> 주문: {currentQuiz.topic || `${currentQuiz.targets[0]}${getWaGwa(currentQuiz.targets[0])} ${currentQuiz.targets[1]}`}</div>
+                  </div>
 
-  const handleWordSelect = (word) => {
-    if (!selectedSlot) return;
-    
-    play8BitSound('selectOption'); // 재료 클릭음 재생
+                  <div className="flex-1 min-h-[300px] sm:min-h-[380px] relative flex items-center justify-center pt-2">
+                    {type === 'enumeration' ? (
+                      <div className="relative flex flex-col items-center w-full max-w-4xl h-full">
+                        <div className="px-6 py-2 sm:px-12 sm:py-4 border-2 text-white responsive-title-text uppercase tracking-tighter shadow-md mb-4 sm:mb-2 z-[60] rounded-full whitespace-nowrap font-bold" style={{ backgroundColor: SKEWER_BROWN, borderColor: SKEWER_BROWN }}>{currentQuiz.topic}</div>
+                        <div className="game-scaling-container">
+                          <div className="absolute inset-0 flex items-center justify-center z-0"><img src={SKEWER_IMG} alt="Skewer" className="w-full h-full object-contain pixelated pointer-events-none" /></div>
+                          <div className="absolute top-[20%] left-0 w-full flex justify-center gap-[1.5%] px-4 z-50">
+                            {currentQuiz.slots.map((slot) => (
+                              <button key={slot.id} onClick={() => handleSlotClick(slot.id)} className={`skewer-slot p-1 transition-all flex flex-col items-center justify-center text-center rounded-lg border-2 ${feedback[slot.id] === 'correct' ? 'border-green-600 bg-white/95 shadow-inner' : feedback[slot.id] === 'wrong' ? 'border-red-600 bg-red-50 animate-shake' : selectedSlot === slot.id ? 'border-4 bg-white shadow-2xl z-[70]' : 'border-black bg-white/70 backdrop-blur-sm'}`} style={{ borderColor: feedback[slot.id] === 'correct' ? '#16A34A' : (selectedSlot === slot.id ? currentPointColor : '#000000') }}>
+                                {feedback[slot.id] === 'correct' && <span className="mb-0 text-sm sm:text-xl font-bold text-green-600">⭐</span>}
+                                <span className="responsive-text break-keep leading-tight font-bold px-1" style={{ color: answers[slot.id] ? '#0F172A' : SKEWER_BROWN }}>{answers[slot.id] || "빈 칸"}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative flex flex-col items-center w-full max-w-4xl h-full">
+                        <div className="px-6 py-2 sm:px-12 sm:py-4 border-2 text-white responsive-title-text uppercase tracking-tighter shadow-md mb-2 sm:mb-0 z-[60] rounded-full whitespace-nowrap font-bold" style={{ backgroundColor: SKEWER_BROWN, borderColor: SKEWER_BROWN }}>{currentQuiz.targets[0]}{getWaGwa(currentQuiz.targets[0])} {currentQuiz.targets[1]} 비교</div>
+                        <div className="game-scaling-container">
+                          <div className="absolute inset-0 flex items-center justify-center z-0"><img src={SHABU_IMG} alt="Shabu" className="w-full h-auto max-h-[250px] sm:max-h-[300px] object-contain pixelated pointer-events-none transform translate-y-[10px]" /></div>
+                          <div className="relative w-full h-full flex items-center justify-center z-50">
+                            <div className="absolute top-[5%] sm:top-[20px] left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 sm:gap-3 w-full">
+                              <div className="px-6 sm:px-8 sm:h-10 border-2 border-black text-white text-[12px] sm:text-[16px] font-bold z-[60] rounded-full shadow-sm flex items-center justify-center whitespace-nowrap" style={{ backgroundColor: BLUE_COLOR }}>공통점</div>
+                              <div className="flex flex-col gap-1 sm:gap-2">
+                                {['common1', 'common2'].map(sid => (
+                                  <button key={sid} onClick={() => handleSlotClick(sid)} className={`shabu-slot-common p-1.5 sm:p-2 transition-all flex flex-col items-center justify-center text-center rounded-lg sm:rounded-xl border-2 ${feedback[sid] === 'correct' ? 'border-green-600 bg-white/95 shadow-inner' : feedback[sid] === 'wrong' ? 'border-red-600 animate-shake' : selectedSlot === sid ? 'border-4 shadow-2xl z-[70]' : 'border-black bg-white/70'}`} style={{ borderColor: feedback[sid] === 'correct' ? '#16A34A' : (selectedSlot === sid ? currentPointColor : '#000000') }}>
+                                    <span className="responsive-text break-keep leading-tight font-bold" style={{ color: answers[sid] ? '#0F172A' : SKEWER_BROWN }}>{answers[sid] || "빈 칸"}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="absolute left-[2%] sm:left-[15%] md:left-[18%] top-[25%] sm:top-[70px] flex flex-col items-center gap-1 sm:gap-3">
+                              <div className="px-3 py-1 sm:px-6 sm:h-10 border-2 border-black text-white text-[10px] sm:text-[16px] font-bold rounded-full shadow-sm flex items-center justify-center whitespace-nowrap" style={{ backgroundColor: BLUE_COLOR }}>{currentQuiz.targets[0]}</div>
+                              <button onClick={() => handleSlotClick('diffA')} className={`shabu-slot-side p-1.5 sm:p-2 transition-all flex flex-col items-center justify-center text-center rounded-lg sm:rounded-xl border-2 ${feedback['diffA'] === 'correct' ? 'border-green-600 bg-white/95 shadow-inner' : feedback['diffA'] === 'wrong' ? 'border-red-600 animate-shake' : selectedSlot === 'diffA' ? 'border-4 shadow-2xl z-[70]' : 'border-black bg-white/70'}`} style={{ borderColor: feedback['diffA'] === 'correct' ? '#16A34A' : (selectedSlot === 'diffA' ? currentPointColor : '#000000') }}>
+                                <span className="responsive-text break-keep leading-tight font-bold" style={{ color: answers['diffA'] ? '#0F172A' : SKEWER_BROWN }}>{answers['diffA'] || "빈 칸"}</span>
+                              </button>
+                            </div>
+                            <div className="absolute right-[2%] sm:right-[15%] md:right-[18%] top-[25%] sm:top-[70px] flex flex-col items-center gap-1 sm:gap-3">
+                              <div className="px-3 py-1 sm:px-6 sm:h-10 border-2 border-black text-white text-[10px] sm:text-[16px] font-bold rounded-full shadow-sm flex items-center justify-center whitespace-nowrap" style={{ backgroundColor: BLUE_COLOR }}>{currentQuiz.targets[1]}</div>
+                              <button onClick={() => handleSlotClick('diffB')} className={`shabu-slot-side p-1.5 sm:p-2 transition-all flex flex-col items-center justify-center text-center rounded-lg sm:rounded-xl border-2 ${feedback['diffB'] === 'correct' ? 'border-green-600 bg-white/95 shadow-inner' : feedback['diffB'] === 'wrong' ? 'border-red-600 animate-shake' : selectedSlot === 'diffB' ? 'border-4 shadow-2xl z-[70]' : 'border-black bg-white/70'}`} style={{ borderColor: feedback['diffB'] === 'correct' ? '#16A34A' : (selectedSlot === 'diffB' ? currentPointColor : '#000000') }}>
+                                <span className="responsive-text break-keep leading-tight font-bold" style={{ color: answers['diffB'] ? '#0F172A' : SKEWER_BROWN }}>{answers['diffB'] || "빈 칸"}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-    const targetWord = word.trim();
-    let isCorrect = false;
-    const isAlreadyUsed = Object.values(answers).some(a => a.trim() === targetWord);
+                  <div className="w-full max-w-[900px] bg-white p-3 border-2 border-slate-900 mt-4 shadow-lg z-[100] max-h-[35%] overflow-y-auto">
+                    <div className="absolute top-0 left-0 w-full h-1 border-b border-slate-900" style={{ backgroundColor: currentPointColor }}></div>
+                    <div className="flex items-center gap-2 mb-2 sm:mb-3 relative z-10 font-bold"><span className="text-lg sm:text-2xl">🧺</span><span className="text-[12px] uppercase">재료 바구니 (정답 선택)</span></div>
+                    <div className="flex flex-wrap gap-1.5 justify-center py-1 relative z-10">
+                      {bank.map((word, i) => {
+                        const isUsed = Object.values(answers).includes(word);
+                        return (
+                          <button key={i} onClick={() => handleWordSelect(word)} disabled={isUsed} className={`px-3 py-1.5 text-[13px] sm:text-[15px] transition-all border-2 border-slate-900 font-bold ${isUsed ? 'opacity-0 scale-50 pointer-events-none' : 'bg-white hover:border-current active:scale-95 shadow-sm'}`} onMouseOver={(e) => { if(!isUsed) e.currentTarget.style.borderColor = currentPointColor; }} onMouseOut={(e) => { if(!isUsed) e.currentTarget.style.borderColor = '#111111'; }}>
+                            {word}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-    if (type === 'enumeration') {
-      const allPossibleAnswers = currentQuiz.slots.map(s => s.answer.trim());
-      isCorrect = allPossibleAnswers.includes(targetWord);
-    } else {
-      if (selectedSlot.startsWith('common')) {
-        const commonAnswers = currentQuiz.slots.filter(s => s.id.startsWith('common')).map(s => s.answer.trim());
-        isCorrect = commonAnswers.includes(targetWord);
-      } else {
-        const specificSlot = currentQuiz.slots.find(s => s.id === selectedSlot);
-        isCorrect = specificSlot && (specificSlot.answer.trim() === targetWord);
-      }
-    }
-
-    if (isCorrect && !isAlreadyUsed) {
-      play8BitSound('correct'); // 정답 효과음 재생
-      const newAnswers = { ...answers, [selectedSlot]: word };
-      setAnswers(newAnswers);
-      setFeedback(prev => ({ ...prev, [selectedSlot]: 'correct' }));
-      setSelectedSlot(null);
-      if (Object.keys(newAnswers).length === currentQuiz.slots.length) {
-        setTimeout(() => setView('success'), 800);
-      }
-    } else {
-      play8BitSound('wrong'); // 오답 효과음 재생
-      setFeedback(prev => ({ ...prev, [selectedSlot]: 'wrong' }));
-      setTimeout(() => setFeedback(prev => ({ ...prev, [selectedSlot]: null })), 800);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-white text-slate-900 flex flex-col items-center select-none overflow-x-hidden">
-      {view !== 'success' && (
-        <nav className="w-full px-6 py-1 bg-white border-b-2 border-slate-900 flex justify-between items-center max-w-6xl sticky top-0 z-[100] shadow-sm">
-          <div className="flex items-center gap-4 cursor-pointer" onClick={() => setView('home')}>
-            <div className="text-3xl">👨‍🍳</div>
-            <div className="flex flex-col">
-              <h1 className="text-lg tracking-tight uppercase leading-none">낱말 요리 타이쿤</h1>
-              {view === 'quiz' && (
-                <div className="text-[14px] mt-1 uppercase tracking-widest" style={{ color: currentPointColor }}>
-                  🔥 {type === 'enumeration' ? '산적꼬치 요리' : '샤브샤브 요리'} 진행 중
+              {view === 'success' && (
+                <div className="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 overflow-hidden">
+                  <div className="w-full max-w-4xl flex flex-col items-center text-center">
+                    <div className="flex gap-4 mb-4"><span className="text-3xl sm:text-4xl animate-bounce-slow">⭐</span><span className="text-3xl sm:text-4xl animate-bounce-slow">⭐</span><span className="text-3xl sm:text-4xl animate-bounce-slow">⭐</span></div>
+                    <div className="mb-6 flex justify-center w-full"><img src="https://img1.daumcdn.net/thumb/R1280x0.fgif/?fname=http://t1.daumcdn.net/brunch/service/user/5ac/image/cpEGqV_FkuNUaH-sGsKHZOyyy64.gif" alt="Celebration" className="w-[150px] sm:w-[200px] h-auto object-contain" /></div>
+                    <div className="flex items-center gap-4 mb-8"><span className="text-2xl sm:text-4xl animate-pulse">✨</span><h2 className="text-3xl sm:text-5xl tracking-tighter uppercase whitespace-nowrap font-bold" style={{ color: currentPointColor }}>요리 완성!</h2><span className="text-2xl sm:text-4xl animate-pulse">✨</span></div>
+                    <p className="text-slate-600 text-[20px] sm:text-[24px] leading-tight text-center mb-12 font-bold">완벽한 요리가 서빙되었습니다!<br/>손님들이 기뻐하고 있어요!</p>
+                    <div className="flex flex-col sm:flex-row gap-4 w-full max-w-lg">
+                      <button onClick={() => initQuiz(type)} className="flex-1 py-4 text-white border-2 border-slate-900 active:translate-y-1 transition-all text-xl uppercase bg-slate-900 hover:opacity-90 font-bold" style={{ backgroundColor: currentPointColor }}>다음 주문!</button>
+                      <button onClick={() => setView('home')} className="flex-1 py-4 text-slate-500 border-2 border-slate-200 hover:text-slate-900 hover:border-slate-900 transition-all text-lg uppercase bg-slate-50 font-bold">메뉴판으로</button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            {view === 'quiz' && (
-              <button onClick={() => setView('home')} className="px-4 py-2 bg-slate-100 border border-slate-900 text-[14px] hover:bg-white active:translate-y-1 transition-all">
-                뒤로가기
-              </button>
-            )}
-          </div>
-        </nav>
-      )}
+          );
+        }
 
-      {view === 'home' && (
-        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center w-full max-w-4xl animate-in fade-in duration-500">
-          <div className="mb-4 flex justify-center">
-            <img src="https://media.tenor.com/MfpEA0u1yYgAAAAj/9.gif" alt="Chef" className="w-[140px] h-[140px] object-contain" />
-          </div>
-          <h2 className="text-xl md:text-3xl mb-12 leading-tight tracking-tighter">
-            <span style={{ color: ORANGE_COLOR }}>글의 구조</span> 요리 게임<br/>재료를 모아 요리를 완성해요!
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 w-full px-6 max-w-3xl mb-8">
-            <button onClick={() => initQuiz('enumeration')} className="bg-white p-8 transition-all group flex flex-col items-center active:scale-95 border-4 border-[#111111] hover:border-[#FF1E8D]">
-              <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">🍢</div>
-              <h3 className="text-xl mb-2">산적꼬치 요리</h3>
-              <p className="text-[14px] mb-3 uppercase tracking-tighter" style={{ color: PINK_COLOR }}>[ 열거 구조 ]</p>
-              <p className="text-slate-500 text-xs">재료를 하나씩 콕콕!</p>
-            </button>
-            <button onClick={() => initQuiz('comparison')} className="bg-white p-8 transition-all group flex flex-col items-center active:scale-95 border-4 border-[#111111] hover:border-[#3B82F6]">
-              <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">🥘</div>
-              <h3 className="text-xl mb-2">샤브샤브 요리</h3>
-              <p className="text-[14px] mb-3 uppercase tracking-tighter" style={{ color: BLUE_COLOR }}>[ 비교와 대조 ]</p>
-              <p className="text-slate-500 text-xs">공통점과 차이점을 담아요.</p>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {view === 'quiz' && currentQuiz && (
-        <div className="flex-1 w-full max-w-[1200px] px-6 py-2 flex flex-col">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-2 z-[60]">
-            <div className="flex items-center gap-3 bg-white border-2 border-slate-900 py-2.5 px-5 text-[14px]">
-              <span className="animate-bounce text-2xl">👉</span>
-              <p>빈 칸을 먼저 누르고 재료 바구니에서 골라 넣으세요!</p>
-            </div>
-            <div className="border-2 border-slate-900 px-6 py-2 flex items-center gap-4 text-white shadow-sm" style={{ backgroundColor: currentPointColor }}>
-              <span className="text-2xl">🔥</span>
-              <h3 className="text-[18px] uppercase tracking-widest">
-                주문: {currentQuiz.topic || `${currentQuiz.targets[0]}${getWaGwa(currentQuiz.targets[0])} ${currentQuiz.targets[1]}`}
-              </h3>
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-[380px] relative flex items-center justify-center pt-2">
-            {type === 'enumeration' ? (
-              <div className="relative flex flex-col items-center w-full max-w-6xl h-full">
-                <div 
-                  className="px-12 py-4 border-2 text-white text-xl md:text-2xl uppercase tracking-tighter shadow-md mb-0 z-[60] rounded-full"
-                  style={{ backgroundColor: SKEWER_BROWN, borderColor: SKEWER_BROWN }}
-                >
-                  {currentQuiz.topic}
-                </div>
-                
-                <div className="relative w-full max-w-5xl h-[320px] flex items-center justify-center overflow-visible">
-                  <div className="absolute inset-0 flex items-center justify-center z-0 -top-8">
-                     <img 
-                        src={SKEWER_IMG} 
-                        alt="Sanjeok Skewer Background" 
-                        className="w-full h-full object-contain pixelated scale-[1.25] pointer-events-none"
-                     />
-                  </div>
-
-                  <div className="absolute flex items-center justify-center gap-1.5 z-50 top-[75px]">
-                    {currentQuiz.slots.map((slot) => (
-                      <button 
-                        key={slot.id} 
-                        onClick={() => handleSlotClick(slot.id)} 
-                        className={`w-28 md:w-32 h-24 md:h-28 p-2 transition-all flex flex-col items-center justify-center text-center rounded-xl border-2 
-                          ${feedback[slot.id] === 'correct' ? 'border-green-600 bg-white/95 shadow-inner' : 
-                            feedback[slot.id] === 'wrong' ? 'border-red-600 bg-red-50/90 animate-shake' : 
-                            selectedSlot === slot.id ? 'border-4 bg-white/95 shadow-2xl z-[70]' : 'border-black bg-white/70 backdrop-blur-md hover:bg-white/90'}`} 
-                        style={{ 
-                          borderColor: feedback[slot.id] === 'correct' ? '#16A34A' : 
-                                      (selectedSlot === slot.id ? currentPointColor : 
-                                      (feedback[slot.id] === 'wrong' ? '#DC2626' : '#000000')),
-                        }}
-                      >
-                        {feedback[slot.id] === 'correct' && <span className="mb-0 text-xl font-bold text-green-600">⭐</span>}
-                        <span 
-                          className="text-[14px] md:text-[17px] break-keep leading-tight font-bold"
-                          style={{ color: answers[slot.id] ? '#0F172A' : SKEWER_BROWN }}
-                        >
-                          {answers[slot.id] || "빈 칸"}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="relative flex flex-col items-center w-full max-w-6xl h-full">
-                <div 
-                  className="px-12 py-4 border-2 text-white text-xl md:text-2xl uppercase tracking-tighter shadow-md mb-0 z-[60] rounded-full"
-                  style={{ backgroundColor: SKEWER_BROWN, borderColor: SKEWER_BROWN }}
-                >
-                  {currentQuiz.targets[0]}{getWaGwa(currentQuiz.targets[0])} {currentQuiz.targets[1]} 비교
-                </div>
-
-                <div className="relative w-full max-w-5xl h-[350px] flex items-center justify-center overflow-visible">
-                  <div className="absolute inset-0 flex items-center justify-center z-0">
-                     <img 
-                        src={SHABU_IMG} 
-                        alt="Shabu Background" 
-                        className="w-full h-full object-contain pixelated scale-[1.15] pointer-events-none transform translate-y-[10px]"
-                     />
-                  </div>
-
-                  <div className="relative w-full h-full flex items-center justify-center z-50">
-                    
-                    <div className="absolute top-[20px] left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
-                      <div className="px-8 h-10 border-2 border-black text-white text-[16px] font-bold z-[60] rounded-full shadow-sm flex items-center justify-center"
-                           style={{ backgroundColor: BLUE_COLOR }}>
-                        공통점
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        {['common1', 'common2'].map(sid => (
-                          <button key={sid} onClick={() => handleSlotClick(sid)} 
-                            className={`w-36 md:w-44 h-24 md:h-30 p-2 transition-all flex flex-col items-center justify-center text-center rounded-xl border-2 
-                              ${feedback[sid] === 'correct' ? 'border-green-600 bg-white/95 shadow-inner' : 
-                                feedback[sid] === 'wrong' ? 'border-red-600 bg-red-50/90 animate-shake' : 
-                                selectedSlot === sid ? 'border-4 bg-white/95 shadow-2xl' : 'border-black bg-white/70 backdrop-blur-md hover:bg-white/90'}`}
-                            style={{ borderColor: feedback[sid] === 'correct' ? '#16A34A' : (selectedSlot === sid ? currentPointColor : '#000000') }}>
-                            {feedback[sid] === 'correct' && <span className="mb-0 text-lg font-bold">⭐</span>}
-                            <span className="text-[13px] md:text-[15px] break-keep leading-tight font-bold"
-                                  style={{ color: answers[sid] ? '#0F172A' : SKEWER_BROWN }}>
-                              {answers[sid] || "빈 칸"}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="absolute left-[23%] md:left-[27%] top-[75px] flex flex-col items-center gap-3">
-                      <div className="px-6 h-10 border-2 border-black text-white text-[16px] font-bold rounded-full shadow-sm flex items-center justify-center"
-                           style={{ backgroundColor: BLUE_COLOR }}>
-                        {currentQuiz.targets[0]}
-                      </div>
-                      <button onClick={() => handleSlotClick('diffA')} 
-                        className={`w-32 md:w-40 h-24 md:h-30 p-2 transition-all flex flex-col items-center justify-center text-center rounded-xl border-2 
-                          ${feedback['diffA'] === 'correct' ? 'border-green-600 bg-white/95 shadow-inner' : 
-                            feedback['diffA'] === 'wrong' ? 'border-red-600 bg-red-50/90 animate-shake' : 
-                            selectedSlot === 'diffA' ? 'border-4 bg-white/95 shadow-2xl' : 'border-black bg-white/70 backdrop-blur-md hover:bg-white/90'}`}
-                        style={{ borderColor: feedback['diffA'] === 'correct' ? '#16A34A' : (selectedSlot === 'diffA' ? currentPointColor : '#000000') }}>
-                        {feedback['diffA'] === 'correct' && <span className="mb-0 text-xl font-bold">⭐</span>}
-                        <span className="text-[13px] md:text-[15px] break-keep leading-tight font-bold"
-                              style={{ color: answers['diffA'] ? '#0F172A' : SKEWER_BROWN }}>
-                          {answers['diffA'] || "빈 칸"}
-                        </span>
-                      </button>
-                    </div>
-
-                    <div className="absolute right-[23%] md:right-[27%] top-[75px] flex flex-col items-center gap-3">
-                      <div className="px-6 h-10 border-2 border-black text-white text-[16px] font-bold rounded-full shadow-sm flex items-center justify-center"
-                           style={{ backgroundColor: BLUE_COLOR }}>
-                        {currentQuiz.targets[1]}
-                      </div>
-                      <button onClick={() => handleSlotClick('diffB')} 
-                        className={`w-32 md:w-40 h-24 md:h-30 p-2 transition-all flex flex-col items-center justify-center text-center rounded-xl border-2 
-                          ${feedback['diffB'] === 'correct' ? 'border-green-600 bg-white/95 shadow-inner' : 
-                            feedback['diffB'] === 'wrong' ? 'border-red-600 bg-red-50/90 animate-shake' : 
-                            selectedSlot === 'diffB' ? 'border-4 bg-white/95 shadow-2xl' : 'border-black bg-white/70 backdrop-blur-md hover:bg-white/90'}`}
-                        style={{ borderColor: feedback['diffB'] === 'correct' ? '#16A34A' : (selectedSlot === 'diffB' ? currentPointColor : '#000000') }}>
-                        {feedback['diffB'] === 'correct' && <span className="mb-0 text-xl font-bold">⭐</span>}
-                        <span className="text-[13px] md:text-[15px] break-keep leading-tight font-bold"
-                              style={{ color: answers['diffB'] ? '#0F172A' : SKEWER_BROWN }}>
-                          {answers['diffB'] || "빈 칸"}
-                        </span>
-                      </button>
-                    </div>
-
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 재료 바구니 */}
-          <div className="bg-white p-5 border-2 border-slate-900 relative mt-auto mb-2 shadow-lg z-[100]">
-            <div className="absolute top-0 left-0 w-full h-1 border-b border-slate-900 z-20" style={{ backgroundColor: currentPointColor }}></div>
-            <div className="flex items-center gap-2 mb-3 relative z-10"><span className="text-2xl">🧺</span><span className="text-[14px] uppercase tracking-tighter">신선한 재료 바구니 (정답 고르기)</span></div>
-            <div className="flex flex-wrap gap-2.5 justify-center py-1.5 relative z-10">
-              {bank.map((word, i) => {
-                const isUsed = Object.values(answers).includes(word);
-                return (
-                  <button key={i} onClick={() => handleWordSelect(word)} disabled={isUsed} className={`px-4 py-2.5 text-[16px] transition-all border-2 border-slate-900 ${isUsed ? 'opacity-10 grayscale cursor-not-allowed scale-90 border-transparent text-transparent' : 'bg-white hover:border-current active:translate-y-0 active:scale-95 shadow-sm'}`} onMouseOver={(e) => { if(!isUsed) e.currentTarget.style.borderColor = currentPointColor; }} onMouseOut={(e) => { if(!isUsed) e.currentTarget.style.borderColor = '#111111'; }}>
-                    {word}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {view === 'success' && (
-        <div className="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 overflow-hidden">
-          <div className="w-full max-w-4xl flex flex-col items-center text-center">
-            <div className="flex gap-4 mb-4"><span className="text-4xl animate-bounce-slow" style={{ animationDelay: '0s' }}>⭐</span><span className="text-4xl animate-bounce-slow" style={{ animationDelay: '0.2s' }}>⭐</span><span className="text-4xl animate-bounce-slow" style={{ animationDelay: '0.4s' }}>⭐</span></div>
-            <div className="mb-6 flex justify-center w-full"><img src="https://img1.daumcdn.net/thumb/R1280x0.fgif/?fname=http://t1.daumcdn.net/brunch/service/user/5ac/image/cpEGqV_FkuNUaH-sGsKHZOyyy64.gif" alt="Celebration" className="w-full max-w-[200px] h-auto object-contain" /></div>
-            <div className="flex items-center gap-4 mb-8"><span className="text-4xl animate-pulse">✨</span><h2 className="text-4xl md:text-6xl tracking-tighter uppercase whitespace-nowrap leading-none" style={{ color: currentPointColor }}>요리 완성!</h2><span className="text-4xl animate-pulse">✨</span></div>
-            <p className="text-slate-600 text-[22px] md:text-[28px] leading-tight text-center mb-16 px-4">완벽한 요리가 서빙되었습니다!<br/>손님들이 기뻐하고 있어요!</p>
-            <div className="flex flex-col sm:flex-row gap-6 w-full max-w-2xl px-4">
-              <button onClick={() => initQuiz(type)} className="flex-1 py-6 text-white border-2 border-slate-900 active:translate-y-1 transition-all text-2xl uppercase bg-slate-900 hover:opacity-90" style={{ backgroundColor: currentPointColor }}>다음 주문 받기!</button>
-              <button onClick={() => setView('home')} className="flex-1 py-6 text-slate-500 border-2 border-slate-200 hover:text-slate-900 hover:border-slate-900 transition-all text-xl uppercase bg-slate-50">메뉴판으로 돌아가기</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default App;
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
