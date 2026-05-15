@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>낱말 요리 타이쿤</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.22.20/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @font-face { font-family: 'DosMyungjo'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSMyungjo.woff') format('woff'); font-weight: normal; }
@@ -44,10 +44,12 @@
         .bg-skewer { transform: scale(1.15) translateY(-5%); }
         .bg-shabu { transform: scale(1.05) translateY(5%); }
 
-        /* 화면 크기에 맞춰 글자 크기 유동적 조절 (PC에서 과도하게 커지는 것 방지) */
+        /* 화면 크기에 맞춰 글자 크기 유동적 조절 */
         .text-slot { font-size: clamp(0.7rem, 1.6vw, 1.2rem); }
         .text-label { font-size: clamp(0.6rem, 1.2vw, 1rem); }
         .text-title { font-size: clamp(1rem, 2vw, 1.5rem); }
+        .responsive-text-base { font-size: clamp(0.85rem, 1.5vw, 1.1rem); }
+        .responsive-text-sm { font-size: clamp(0.7rem, 1.2vw, 1rem); }
 
         /* 공통 버튼 디자인 */
         .slot-btn {
@@ -60,15 +62,22 @@
             transition: all 0.2s;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
+
+        /* 빈 칸 박스 크기 및 가동 범위 제한 */
+        .skewer-slot { width: 13%; height: 22%; max-width: 115px; max-height: 95px; }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <div style="display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; font-size:1.5rem; font-weight:bold;">
+            👨‍🍳 요리 재료를 준비 중입니다... 잠시만 기다려주세요!
+        </div>
+    </div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // --- 완벽히 동기화된 전체 문제 데이터베이스 (16종 전체) ---
+        // --- 완벽히 동기화된 전체 문제 데이터베이스 (16종) ---
         const QUIZ_DATA = {
           enumeration: [
             { id: 'e1', topic: '우리나라의 전통 놀이', slots: [{ id: 's1', answer: '제기차기' }, { id: 's2', answer: '윷놀이' }, { id: 's3', answer: '투호' }, { id: 's4', answer: '널뛰기' }], distractors: ['스마트폰 게임', '체스', '축구'] },
@@ -190,7 +199,8 @@
               if (selectedSlot.startsWith('common')) {
                 isCorrect = currentQuiz.slots.filter(s => s.id.startsWith('common')).map(s => s.answer.trim()).includes(targetWord);
               } else {
-                isCorrect = currentQuiz.slots.find(s => s.id === selectedSlot)?.answer.trim() === targetWord;
+                const specificSlot = currentQuiz.slots.find(s => s.id === selectedSlot);
+                isCorrect = specificSlot && (specificSlot.answer.trim() === targetWord);
               }
             }
 
@@ -205,12 +215,188 @@
             }
           };
 
-          // 슬롯 공통 렌더링 스타일 함수
           const getSlotStyle = (slotId) => {
             if (feedback[slotId] === 'correct') return 'border-green-600 bg-white/95 shadow-inner';
             if (feedback[slotId] === 'wrong') return 'border-red-600 bg-red-50/90 animate-shake';
             if (selectedSlot === slotId) return 'border-4 bg-white/95 shadow-2xl z-50 scale-105';
             return 'border-black bg-white/75 backdrop-blur-sm hover:bg-white/95';
           };
+          
           const getSlotBorder = (slotId) => {
-            if (feedback[slotId] ===
+            if (feedback[slotId] === 'correct') return '#16A34A';
+            if (feedback[slotId] === 'wrong') return '#DC2626';
+            return selectedSlot === slotId ? currentPointColor : '#000000';
+          };
+
+          return (
+            <div className="min-h-screen bg-white text-slate-900 flex flex-col items-center select-none overflow-x-hidden pb-4">
+              {view !== 'success' && (
+                <nav className="w-full px-4 sm:px-6 py-2 bg-white border-b-2 border-slate-900 flex justify-between items-center max-w-6xl sticky top-0 z-[100] shadow-sm">
+                  <div className="flex items-center gap-2 sm:gap-4 cursor-pointer" onClick={() => setView('home')}>
+                    <div className="text-2xl sm:text-3xl">👨‍🍳</div>
+                    <div className="flex flex-col">
+                      <h1 className="text-base sm:text-lg tracking-tight uppercase leading-none font-bold">낱말 요리 타이쿤</h1>
+                      {view === 'quiz' && <div className="text-[10px] sm:text-[12px] mt-0.5 font-bold" style={{ color: currentPointColor }}>{type === 'enumeration' ? '산적꼬치' : '샤브샤브'}</div>}
+                    </div>
+                  </div>
+                  {view === 'quiz' && (
+                    <button onClick={() => setView('home')} className="px-3 py-1 sm:px-4 sm:py-2 bg-slate-100 border border-slate-900 text-[12px] sm:text-[14px] hover:bg-white active:translate-y-0.5 transition-all font-bold">
+                      뒤로가기
+                    </button>
+                  )}
+                </nav>
+              )}
+
+              {view === 'home' && (
+                <div className="flex-1 flex flex-col items-center justify-center p-4 text-center w-full max-w-4xl animate-in fade-in duration-500">
+                  <div className="mb-4 flex justify-center"><img src="https://media.tenor.com/MfpEA0u1yYgAAAAj/9.gif" alt="Chef" className="w-[100px] h-[100px] sm:w-[140px] sm:h-[140px] object-contain" /></div>
+                  <h2 className="text-xl sm:text-2xl md:text-3xl mb-8 sm:mb-12 leading-tight tracking-tighter font-bold">
+                    <span style={{ color: ORANGE_COLOR }}>글의 구조</span> 요리 게임<br/>재료를 모아 요리를 완성해요!
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10 w-full px-4 max-w-3xl mb-8">
+                    <button onClick={() => initQuiz('enumeration')} className="bg-white p-6 sm:p-8 transition-all group flex flex-col items-center active:scale-95 border-4 border-[#111111] hover:border-[#FF1E8D]">
+                      <div className="text-5xl sm:text-6xl mb-4 group-hover:scale-110 transition-transform">🍢</div>
+                      <h3 className="text-lg sm:text-xl mb-2 font-bold">산적꼬치 요리</h3>
+                      <p className="text-[12px] sm:text-[14px] mb-3 uppercase tracking-tighter font-bold" style={{ color: PINK_COLOR }}>[ 열거 구조 ]</p>
+                      <p className="text-slate-500 text-[10px] sm:text-xs font-bold">재료를 하나씩 콕콕!</p>
+                    </button>
+                    <button onClick={() => initQuiz('comparison')} className="bg-white p-6 sm:p-8 transition-all group flex flex-col items-center active:scale-95 border-4 border-[#111111] hover:border-[#3B82F6]">
+                      <div className="text-5xl sm:text-6xl mb-4 group-hover:scale-110 transition-transform">🥘</div>
+                      <h3 className="text-lg sm:text-xl mb-2 font-bold">샤브샤브 요리</h3>
+                      <p className="text-[12px] sm:text-[14px] mb-3 uppercase tracking-tighter font-bold" style={{ color: BLUE_COLOR }}>[ 비교와 대조 ]</p>
+                      <p className="text-slate-500 text-[10px] sm:text-xs font-bold">공통점과 차이점을 담아요.</p>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {view === 'quiz' && currentQuiz && (
+                <div className="flex-1 w-full max-w-[1200px] px-2 sm:px-6 py-4 flex flex-col items-center">
+                  
+                  <div className="w-full max-w-[900px] flex flex-col sm:flex-row items-center justify-between gap-2 mb-4 z-[60]">
+                    <div className="flex items-center gap-2 bg-white border-2 border-slate-900 py-1.5 px-3 sm:px-5 text-sm font-bold shadow-sm">
+                      <span className="animate-bounce">👉</span> 빈 칸 누르고 재료를 골라주세요!
+                    </div>
+                    <div className="border-2 border-slate-900 px-4 py-1.5 flex items-center gap-2 text-white shadow-sm font-bold responsive-text-base text-center break-keep" style={{ backgroundColor: currentPointColor }}>
+                      <span>🔥</span> 
+                      주문: {type === 'enumeration' ? (currentQuiz ? currentQuiz.topic : '') : `${currentQuiz && currentQuiz.targets ? currentQuiz.targets[0] : ''}${getWaGwa(currentQuiz && currentQuiz.targets ? currentQuiz.targets[0] : '')} ${currentQuiz && currentQuiz.targets ? currentQuiz.targets[1] : ''} 비교`}
+                    </div>
+                  </div>
+
+                  <div className="w-full border-2 border-slate-900 rounded-xl overflow-hidden shadow-sm relative" style={{ maxWidth: '900px', backgroundColor: '#f8fafc' }}>
+                    
+                    <div className="absolute top-[3%] left-1/2 -translate-x-1/2 px-6 sm:px-10 py-1.5 sm:py-2.5 border-2 text-white text-title font-bold rounded-full shadow-md z-[60] whitespace-nowrap" style={{ backgroundColor: SKEWER_BROWN, borderColor: SKEWER_BROWN }}>
+                      {type === 'enumeration' ? (currentQuiz ? currentQuiz.topic : '') : `${currentQuiz && currentQuiz.targets ? currentQuiz.targets[0] : ''} vs ${currentQuiz && currentQuiz.targets ? currentQuiz.targets[1] : ''}`}
+                    </div>
+
+                    <div className="game-board">
+                      {type === 'enumeration' ? (
+                        <React.Fragment>
+                          <img src={SKEWER_IMG} alt="Skewer" className="game-bg bg-skewer" />
+                          <div className="absolute top-[42%] left-0 w-full flex justify-center gap-[2%] z-50 px-2">
+                            {currentQuiz.slots.map((slot) => (
+                              <button key={slot.id} onClick={() => handleSlotClick(slot.id)} 
+                                className={`slot-btn skewer-slot rounded-xl ${getSlotStyle(slot.id)}`} 
+                                style={{ borderColor: getSlotBorder(slot.id) }}>
+                                {feedback[slot.id] === 'correct' && <span className="mb-0 text-sm sm:text-xl font-bold text-green-600 leading-none">⭐</span>}
+                                <span className="text-slot font-bold px-1 mt-1 break-keep" style={{ color: answers[slot.id] ? '#0F172A' : SKEWER_BROWN }}>{answers[slot.id] || "빈 칸"}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </React.Fragment>
+                      ) : (
+                        <React.Fragment>
+                          <img src={SHABU_IMG} alt="Shabu" className="game-bg bg-shabu" />
+                          
+                          <div className="absolute top-[16%] left-1/2 -translate-x-1/2 w-[24%] flex flex-col items-center z-50">
+                            <div className="px-4 py-0.5 sm:py-1 border-2 border-black text-white text-label font-bold rounded-full shadow-sm bg-blue-500 mb-[4%] whitespace-nowrap">공통점</div>
+                            <div className="flex flex-col gap-2 w-full">
+                              {['common1', 'common2'].map(sid => (
+                                <button key={sid} onClick={() => handleSlotClick(sid)} 
+                                  className={`slot-btn w-full aspect-[5/2] rounded-lg sm:rounded-xl ${getSlotStyle(sid)}`}
+                                  style={{ borderColor: getSlotBorder(sid) }}>
+                                  <span className="text-slot font-bold px-1" style={{ color: answers[sid] ? '#0F172A' : SKEWER_BROWN }}>{answers[sid] || "빈 칸"}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="absolute top-[35%] left-[16%] w-[20%] flex flex-col items-center z-50">
+                            <div className="px-4 py-0.5 sm:py-1 border-2 border-black text-white text-label font-bold rounded-full shadow-sm bg-blue-500 mb-[6%] whitespace-nowrap">{currentQuiz && currentQuiz.targets ? currentQuiz.targets[0] : ''}</div>
+                            <button onClick={() => handleSlotClick('diffA')} 
+                              className={`slot-btn w-full aspect-[4/3] rounded-lg sm:rounded-xl ${getSlotStyle('diffA')}`}
+                              style={{ borderColor: getSlotBorder('diffA') }}>
+                              <span className="text-slot font-bold px-1" style={{ color: answers['diffA'] ? '#0F172A' : SKEWER_BROWN }}>{answers['diffA'] || "빈 칸"}</span>
+                            </button>
+                          </div>
+
+                          <div className="absolute top-[35%] right-[16%] w-[20%] flex flex-col items-center z-50">
+                            <div className="px-4 py-0.5 sm:py-1 border-2 border-black text-white text-label font-bold rounded-full shadow-sm bg-blue-500 mb-[6%] whitespace-nowrap">{currentQuiz && currentQuiz.targets ? currentQuiz.targets[1] : ''}</div>
+                            <button onClick={() => handleSlotClick('diffB')} 
+                              className={`slot-btn w-full aspect-[4/3] rounded-lg sm:rounded-xl ${getSlotStyle('diffB')}`}
+                              style={{ borderColor: getSlotBorder('diffB') }}>
+                              <span className="text-slot font-bold px-1" style={{ color: answers['diffB'] ? '#0F172A' : SKEWER_BROWN }}>{answers['diffB'] || "빈 칸"}</span>
+                            </button>
+                          </div>
+                        </React.Fragment>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="w-full max-w-[900px] bg-white p-3 sm:p-5 border-2 border-slate-900 mt-4 shadow-sm relative">
+                    <div className="absolute top-0 left-0 w-full h-1 border-b border-slate-900" style={{ backgroundColor: currentPointColor }}></div>
+                    <div className="flex items-center gap-2 mb-3 relative z-10 font-bold">
+                      <span className="text-xl sm:text-2xl">🧺</span>
+                      <span className="text-[12px] sm:text-[14px] uppercase tracking-tighter text-slate-700">신선한 재료 바구니</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 justify-center py-1 relative z-10">
+                      {bank.map((word, i) => {
+                        const isUsed = Object.values(answers).includes(word);
+                        return (
+                          <button key={i} onClick={() => handleWordSelect(word)} disabled={isUsed} 
+                            className={`px-3 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[15px] transition-all border-2 border-slate-900 font-bold rounded shadow-sm
+                            ${isUsed ? 'opacity-0 scale-50 pointer-events-none absolute' : 'bg-white hover:bg-slate-50 active:scale-95 hover:-translate-y-0.5'}`} 
+                            style={{ borderColor: isUsed ? 'transparent' : '#111111' }}
+                            onMouseOver={(e) => { if(!isUsed) e.currentTarget.style.borderColor = currentPointColor; }} 
+                            onMouseOut={(e) => { if(!isUsed) e.currentTarget.style.borderColor = '#111111'; }}>
+                            {word}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {view === 'success' && (
+                <div className="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 overflow-hidden">
+                  <div className="w-full max-w-4xl flex flex-col items-center text-center">
+                    <div className="flex gap-4 mb-4">
+                      <span className="text-4xl animate-bounce-slow" style={{ animationDelay: '0s' }}>⭐</span>
+                      <span className="text-4xl animate-bounce-slow" style={{ animationDelay: '0.2s' }}>⭐</span>
+                      <span className="text-4xl animate-bounce-slow" style={{ animationDelay: '0.4s' }}>⭐</span>
+                    </div>
+                    <div className="mb-6 flex justify-center w-full"><img src="https://img1.daumcdn.net/thumb/R1280x0.fgif/?fname=http://t1.daumcdn.net/brunch/service/user/5ac/image/cpEGqV_FkuNUaH-sGsKHZOyyy64.gif" alt="Celebration" className="w-[160px] sm:w-[200px] h-auto object-contain" /></div>
+                    <div className="flex items-center gap-4 mb-8">
+                      <span className="text-3xl sm:text-4xl animate-pulse">✨</span>
+                      <h2 className="text-4xl sm:text-6xl tracking-tighter uppercase whitespace-nowrap font-bold" style={{ color: currentPointColor }}>요리 완성!</h2>
+                      <span className="text-3xl sm:text-4xl animate-pulse">✨</span>
+                    </div>
+                    <p className="text-slate-600 text-[20px] sm:text-[28px] leading-tight text-center mb-12 font-bold">완벽한 요리가 서빙되었습니다!<br/>손님들이 기뻐하고 있어요!</p>
+                    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 w-full max-w-lg px-4">
+                      <button onClick={() => initQuiz(type)} className="flex-1 py-4 sm:py-6 text-white border-2 border-slate-900 active:translate-y-1 transition-all text-xl sm:text-2xl uppercase bg-slate-900 hover:opacity-90 font-bold rounded-lg shadow-sm" style={{ backgroundColor: currentPointColor }}>다음 주문 받기!</button>
+                      <button onClick={() => setView('home')} className="flex-1 py-4 sm:py-6 text-slate-600 border-2 border-slate-300 hover:text-slate-900 hover:border-slate-900 transition-all text-lg sm:text-xl uppercase bg-slate-50 font-bold rounded-lg shadow-sm">메뉴판으로 가기</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
