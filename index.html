@@ -63,8 +63,8 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        /* 빈 칸 박스 크기 및 가동 범위 제한 */
-        .skewer-slot { width: 13%; height: 22%; max-width: 115px; max-height: 95px; }
+        /* 빈 칸 박스 크기 및 가동 범위 제한 (높이를 25%로 키움) */
+        .skewer-slot { width: 13%; height: 25%; max-width: 115px; max-height: 100px; }
     </style>
 </head>
 <body>
@@ -92,7 +92,7 @@
           comparison: [
             { id: 'c1', targets: ['버스', '지하철'], slots: [{ id: 'common1', answer: '대중교통 수단이다' }, { id: 'common2', answer: '많은 사람이 이용한다' }, { id: 'diffA', answer: '도로 위를 달린다' }, { id: 'diffB', answer: '지하 선로를 이용한다' }], distractors: ['하늘을 날아다닌다', '개인이 소유하는 자가용', '우주로 나가는 발사체'] },
             { id: 'c2', targets: ['도서관', '서점'], slots: [{ id: 'common1', answer: '책이 아주 많다' }, { id: 'common2', answer: '조용히 해야 하는 장소이다' }, { id: 'diffA', answer: '무료로 책을 빌려준다' }, { id: 'diffB', answer: '돈을 내고 책을 산다' }], distractors: ['음식을 요리해서 판다', '운동경기를 관람하는 곳', '영화를 상영하는 극장'] },
-            { id: 'c3', targets: ['축구', '농구'], slots: [{ id: 'common1', answer: '공을 사용하는 운동이다' }, { id: 'common2', answer: '팀을 나누어 경기를 한다' }, { id: 'diffA', answer: '주로 발로 공을 찬다' }, { id: 'diffB', answer: '주로 손으로 공을 던진다' }], distractors: ['물속에서 하는 운동이다', '혼자서만 즐기는 스포츠', '얼음 위에서 타는 스케이트'] },
+            { id: 'c3', targets: ['축구', '농구'], slots: [{ id: 'common1', answer: '공을 사용하는 운동이다' }, { id: 'common2', answer: '팀을 나누어 경기를 구한다' }, { id: 'diffA', answer: '주로 발로 공을 찬다' }, { id: 'diffB', answer: '주로 손으로 공을 던진다' }], distractors: ['물속에서 하는 운동이다', '혼자서만 즐기는 스포츠', '얼음 위에서 타는 스케이트'] },
             { id: 'c4', targets: ['지구', '달'], slots: [{ id: 'common1', answer: '우주에 있는 천체이다' }, { id: 'common2', answer: '둥근 모양을 하고 있다' }, { id: 'diffA', answer: '생명체가 살고 있다' }, { id: 'diffB', answer: '지구의 주위를 도는 위성이다' }], distractors: ['사람이 만든 인공물이다', '눈이 부시게 빛나는 항성', '사각형의 평평한 모양'] },
             { id: 'c5', targets: ['연필', '샤프'], slots: [{ id: 'common1', answer: '글씨를 쓰는 도구이다' }, { id: 'common2', answer: '공부할 때 주로 사용한다' }, { id: 'diffA', answer: '나무로 만들어 깎아 쓴다' }, { id: 'diffB', answer: '버튼을 눌러 심을 낸다' }], distractors: ['배고플 때 먹는 음식이다', '발에 신는 신발의 종류', '몸을 씻는 세면도구'] },
             { id: 'c6', targets: ['종이책', '전자책'], slots: [{ id: 'common1', answer: '정보를 전달하는 매체이다' }, { id: 'common2', answer: '글과 그림으로 구성되어 있다' }, { id: 'diffA', answer: '종이로 만들어 넘겨 읽는다' }, { id: 'diffB', answer: '전자기기 화면을 통해 읽는다' }], distractors: ['배터리가 없어도 둘 다 작동한다', '음악을 연주하는 악기이다', '옷을 만드는 재료이다'] },
@@ -112,7 +112,10 @@
           const [view, setView] = useState('home'); 
           const [type, setType] = useState(null);
           const [currentQuiz, setCurrentQuiz] = useState(null);
-          const [lastQuizId, setLastQuizId] = useState(null);
+          
+          // 이미 푼 문제를 기록하는 상태 (게임 모드별로 분리)
+          const [playedQuizzes, setPlayedQuizzes] = useState({ enumeration: [], comparison: [] });
+          
           const [bank, setBank] = useState([]);
           const [selectedSlot, setSelectedSlot] = useState(null);
           const [answers, setAnswers] = useState({});
@@ -178,10 +181,30 @@
           const initQuiz = (quizType) => {
             play8BitSound('startGame');
             const questions = QUIZ_DATA[quizType];
-            let availableQuestions = questions.length > 1 ? questions.filter(q => q.id !== lastQuizId) : questions;
+            let played = playedQuizzes[quizType];
+            
+            // 이미 푼 문제는 필터링
+            let availableQuestions = questions.filter(q => !played.includes(q.id));
+            
+            // 모든 문제를 다 풀었으면 기록 초기화
+            if (availableQuestions.length === 0) {
+              availableQuestions = questions;
+              played = [];
+            }
+            
             const quiz = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
             const options = [...quiz.slots.map(s => s.answer), ...quiz.distractors].sort(() => Math.random() - 0.5);
-            setLastQuizId(quiz.id); setType(quizType); setCurrentQuiz(quiz); setBank(options); setAnswers({}); setFeedback({}); setSelectedSlot(null); setView('quiz');
+            
+            // 푼 문제 목록 업데이트
+            setPlayedQuizzes(prev => ({ ...prev, [quizType]: [...played, quiz.id] }));
+            
+            setType(quizType); 
+            setCurrentQuiz(quiz); 
+            setBank(options); 
+            setAnswers({}); 
+            setFeedback({}); 
+            setSelectedSlot(null); 
+            setView('quiz');
           };
 
           const handleSlotClick = (slotId) => { if (feedback[slotId] !== 'correct') { play8BitSound('selectSlot'); setSelectedSlot(slotId); } };
@@ -208,7 +231,6 @@
               play8BitSound('correct');
               const newAnswers = { ...answers, [selectedSlot]: word };
               setAnswers(newAnswers); setFeedback(prev => ({ ...prev, [selectedSlot]: 'correct' })); setSelectedSlot(null);
-              // 정답 화면 전환 딜레이를 800ms -> 1000ms로 늘려 안정성 확보
               if (Object.keys(newAnswers).length === currentQuiz.slots.length) setTimeout(() => setView('success'), 1000);
             } else {
               play8BitSound('wrong'); setFeedback(prev => ({ ...prev, [selectedSlot]: 'wrong' }));
@@ -286,7 +308,6 @@
 
                   <div className="w-full border-2 border-slate-900 rounded-xl overflow-hidden shadow-sm relative" style={{ maxWidth: '900px', backgroundColor: '#f8fafc' }}>
                     
-                    {/* 모바일 화면에서 공통점 라벨과 겹치지 않게 top 비율을 소폭 수정했습니다 */}
                     <div className="absolute top-[2%] sm:top-[3%] left-1/2 -translate-x-1/2 px-6 sm:px-10 py-1.5 sm:py-2.5 border-2 text-white text-title font-bold rounded-full shadow-md z-[60] whitespace-nowrap" style={{ backgroundColor: SKEWER_BROWN, borderColor: SKEWER_BROWN }}>
                       {type === 'enumeration' ? (currentQuiz ? currentQuiz.topic : '') : `${currentQuiz && currentQuiz.targets ? currentQuiz.targets[0] : ''} vs ${currentQuiz && currentQuiz.targets ? currentQuiz.targets[1] : ''}`}
                     </div>
@@ -295,14 +316,14 @@
                       {type === 'enumeration' ? (
                         <React.Fragment>
                           <img src={SKEWER_IMG} alt="Skewer" className="game-bg bg-skewer" />
-                          <div className="absolute top-[42%] left-0 w-full flex justify-center gap-[2%] z-50 px-2">
+                          <div className="absolute top-[46%] left-0 w-full flex justify-center gap-[2%] z-50 px-2">
                             {currentQuiz.slots.map((slot) => (
                               <button key={slot.id} onClick={() => handleSlotClick(slot.id)} 
-                                className={`slot-btn skewer-slot rounded-xl ${getSlotStyle(slot.id)}`} 
+                                className={`slot-btn skewer-slot rounded-xl relative ${getSlotStyle(slot.id)}`} 
                                 style={{ borderColor: getSlotBorder(slot.id) }}>
-                                {/* 빈칸일 때도 투명 상태(opacity-0)로 영역을 차지하게 하여 레이아웃 높이 변화를 방지했습니다 */}
-                                <span className={`mb-0 text-sm sm:text-xl font-bold text-green-600 leading-none transition-opacity duration-200 ${feedback[slot.id] === 'correct' ? 'opacity-100' : 'opacity-0'}`}>⭐</span>
-                                <span className="text-slot font-bold px-1 mt-1 break-keep" style={{ color: answers[slot.id] ? '#0F172A' : SKEWER_BROWN }}>{answers[slot.id] || "빈 칸"}</span>
+                                <span className={`absolute top-1 sm:top-1.5 text-sm sm:text-xl font-bold text-green-600 leading-none transition-opacity duration-200 ${feedback[slot.id] === 'correct' ? 'opacity-100' : 'opacity-0'}`}>⭐</span>
+                                {/* 갈색(SKEWER_BROWN)으로 고정 */}
+                                <span className="text-slot font-bold px-1 break-keep z-10" style={{ color: SKEWER_BROWN }}>{answers[slot.id] || "빈 칸"}</span>
                               </button>
                             ))}
                           </div>
@@ -311,7 +332,6 @@
                         <React.Fragment>
                           <img src={SHABU_IMG} alt="Shabu" className="game-bg bg-shabu" />
                           
-                          {/* 모바일 환경에서 위 타이틀과 겹치지 않게 top 비율을 수정했습니다 */}
                           <div className="absolute top-[22%] sm:top-[18%] md:top-[16%] left-1/2 -translate-x-1/2 w-[24%] flex flex-col items-center z-50">
                             <div className="px-4 py-0.5 sm:py-1 border-2 border-black text-white text-label font-bold rounded-full shadow-sm bg-blue-500 mb-[4%] whitespace-nowrap">공통점</div>
                             <div className="flex flex-col gap-2 w-full">
@@ -319,7 +339,7 @@
                                 <button key={sid} onClick={() => handleSlotClick(sid)} 
                                   className={`slot-btn w-full aspect-[5/2] rounded-lg sm:rounded-xl ${getSlotStyle(sid)}`}
                                   style={{ borderColor: getSlotBorder(sid) }}>
-                                  <span className="text-slot font-bold px-1" style={{ color: answers[sid] ? '#0F172A' : SKEWER_BROWN }}>{answers[sid] || "빈 칸"}</span>
+                                  <span className="text-slot font-bold px-1" style={{ color: SKEWER_BROWN }}>{answers[sid] || "빈 칸"}</span>
                                 </button>
                               ))}
                             </div>
@@ -330,7 +350,7 @@
                             <button onClick={() => handleSlotClick('diffA')} 
                               className={`slot-btn w-full aspect-[4/3] rounded-lg sm:rounded-xl ${getSlotStyle('diffA')}`}
                               style={{ borderColor: getSlotBorder('diffA') }}>
-                              <span className="text-slot font-bold px-1" style={{ color: answers['diffA'] ? '#0F172A' : SKEWER_BROWN }}>{answers['diffA'] || "빈 칸"}</span>
+                              <span className="text-slot font-bold px-1" style={{ color: SKEWER_BROWN }}>{answers['diffA'] || "빈 칸"}</span>
                             </button>
                           </div>
 
@@ -339,7 +359,7 @@
                             <button onClick={() => handleSlotClick('diffB')} 
                               className={`slot-btn w-full aspect-[4/3] rounded-lg sm:rounded-xl ${getSlotStyle('diffB')}`}
                               style={{ borderColor: getSlotBorder('diffB') }}>
-                              <span className="text-slot font-bold px-1" style={{ color: answers['diffB'] ? '#0F172A' : SKEWER_BROWN }}>{answers['diffB'] || "빈 칸"}</span>
+                              <span className="text-slot font-bold px-1" style={{ color: SKEWER_BROWN }}>{answers['diffB'] || "빈 칸"}</span>
                             </button>
                           </div>
                         </React.Fragment>
